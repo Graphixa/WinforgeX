@@ -9,7 +9,7 @@
     This script performs a series of system configurations based on the values specified in the provided INI file. 
     The configurations include setting the computer name, locale, timezone, installing applications, setting wallpapers and lock screens, 
     modifying registry entries, configuring network settings, power settings, software updates, security settings, environment variables, 
-    importing tasks into Task Scheduler, and installing Google Chrome Enterprise, Google Credential Provider for Windows (GCPW), and Google Drive.
+    importing tasks into Task Scheduler, installing Google Chrome Enterprise, Google Credential Provider for Windows (GCPW), Google Drive, and activating Windows.
 
     .EXAMPLE
     .\install.ps1 -config="C:\Path\To\Config.ini"
@@ -376,7 +376,7 @@ function Set-LockScreenImage {
 # Function to add registry entries
 function Add-RegistryEntries {
     try {
-        $registrySection = $config["Registry Add"]
+        $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
@@ -401,7 +401,7 @@ function Add-RegistryEntries {
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
-        $registrySection = $config["Registry Remove"]
+        $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
@@ -473,7 +473,7 @@ function Set-PowerSettings {
 # Function to configure software updates
 function Set-SoftwareUpdates {
     try {
-        $autoUpdatesEnabled = Get-ConfigValue -section "SoftwareUpdates" -key "AutoUpdatesEnabled"
+        $autoUpdatesEnabled = Get-ConfigValue -section "WindowsUpdate" -key "AutoUpdatesEnabled"
 
         if ($autoUpdatesEnabled) {
             Write-Log "Configuring software updates..."
@@ -735,6 +735,27 @@ function Import-Tasks {
     }
 }
 
+# Function to activate Windows
+function Activate-Windows {
+    try {
+        $productKey = Get-ConfigValue -section "Activation" -key "ProductKey"
+        $version = Get-ConfigValue -section "Activation" -key "Version"
+
+        if ($productKey -and $version) {
+            Write-Log "Activating Windows with product key: $productKey and version: $version"
+            slmgr.vbs /ipk $productKey
+            slmgr.vbs /skms kms.server.address
+            slmgr.vbs /ato
+            Write-Log "Windows activated successfully."
+        } else {
+            Write-Log "Windows activation not performed. Missing configuration."
+        }
+    } catch {
+        Write-Log "Error activating Windows: $($_.Exception.Message)"
+        exit 1
+    }
+}
+
 # Download and read the configuration file if it's a URL
 function Get-ConfigFile {
     param (
@@ -785,5 +806,12 @@ Install-Office
 Install-GCPW
 Install-ChromeEnterprise
 Install-GoogleDrive
+Activate-Windows
+
+# Remove the configuration file if it was downloaded
+if ($configFile -match "$env:TEMP\config.ini") {
+    Remove-Item -Path $configFile -Force -ErrorAction SilentlyContinue
+    Write-Log "Temporary configuration file removed."
+}
 
 Write-Log "System configuration completed successfully."
