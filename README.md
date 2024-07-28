@@ -17,19 +17,6 @@ This PowerShell script automates the configuration of a Windows system using par
 - Importing tasks into Task Scheduler, and
 - Installing Google Chrome Enterprise, Google Credential Provider for Windows (GCPW), and Google Drive.
 
-## Requirements
-
-- Windows 11 (Can be run on Windows 10 but Winget must be installed)
-- **Winget** must be installed to install applications using the script
-- Ability to run PowerShell scripts on your system - use the following to enable the running of scripts:
-
-> [!NOTE]
-> To enable the running of Powershell scripts on your system, open Powershell as administrator and run the following command:
-```
-set-executionpolicy bypass
-```
-
-
 ## Usage
 
 ### Running the Script Locally
@@ -47,6 +34,18 @@ Download a copy of the script and run it locally, use the following command:
 
 ## INI File Setup
 For detailed information on each configuration option, refer to the [Configuration Guide](https://github.com/Graphixa/WinforgeX/wiki/WinForgeX-Configuration-Script-Knowledge-Base).
+
+## Requirements
+
+- Windows 11 (Can be run on Windows 10 but Winget must be installed)
+- **Winget** must be installed to install applications using the script
+- Ability to run PowerShell scripts on your system - use the following to enable the running of scripts:
+
+> [!NOTE]
+> To enable the running of Powershell scripts on your system, open Powershell as administrator and run the following command:
+```
+set-executionpolicy bypass
+```
 
 ## Contributing
 Feel free to contribute to this project by submitting issues or pull requests. 
