@@ -21,8 +21,6 @@
 
 #>
 
-
-
 # Define paths and initialize variables
 param (
     [Parameter(Mandatory=$true)]
@@ -74,6 +72,21 @@ function Get-ConfigValue {
     } else {
         return $null
     }
+}
+
+# Function to validate required keys for sections
+function Validate-RequiredKeys {
+    param (
+        [string]$section,
+        [string[]]$requiredKeys
+    )
+    foreach ($key in $requiredKeys) {
+        if (-not $config[$section][$key]) {
+            Write-Log "Missing required key '$key' in section '$section'"
+            return $false
+        }
+    }
+    return $true
 }
 
 # Function to set computer name
@@ -232,6 +245,12 @@ function Install-Fonts {
 # Function to install Microsoft Office
 function Install-Office {
     try {
+        $requiredKeys = @("LicenseKey", "ProductID", "LanguageID", "UpdatesEnabled", "DisplayLevel", "SetupReboot", "Channel", "OfficeClientEdition")
+        if (-not (Validate-RequiredKeys -section "Office" -requiredKeys $requiredKeys)) {
+            Write-Log "Skipping Office installation due to missing keys."
+            return
+        }
+
         $licenseKey = Get-ConfigValue -section "Office" -key "LicenseKey"
         $productID = Get-ConfigValue -section "Office" -key "ProductID"
         $languageID = Get-ConfigValue -section "Office" -key "LanguageID"
@@ -241,17 +260,16 @@ function Install-Office {
         $channel = Get-ConfigValue -section "Office" -key "Channel"
         $officeClientEdition = Get-ConfigValue -section "Office" -key "OfficeClientEdition"
 
-        if ($licenseKey -and $productID -and $languageID -and $updatesEnabled -and $displayLevel -and $setupReboot -and $channel -and $officeClientEdition) {
-            $odtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16731-20398.exe"
-            $odtPath = $env:TEMP
-            $odtFile = "$odtPath/ODTSetup.exe"
-            $configurationXMLFile = "$odtPath\configuration.xml"
+        $odtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16731-20398.exe"
+        $odtPath = $env:TEMP
+        $odtFile = "$odtPath/ODTSetup.exe"
+        $configurationXMLFile = "$odtPath\configuration.xml"
 
-            Write-Log "Downloading Office Deployment Tool..."
-            Invoke-WebRequest -Uri $odtUrl -OutFile $odtFile
+        Write-Log "Downloading Office Deployment Tool..."
+        Invoke-WebRequest -Uri $odtUrl -OutFile $odtFile
 
-            Write-Log "Creating configuration XML file..."
-            @"
+        Write-Log "Creating configuration XML file..."
+        @"
 <Configuration>
   <Add OfficeClientEdition="$officeClientEdition" Channel="$channel">
     <Product ID="$productID">
@@ -266,20 +284,17 @@ function Install-Office {
 </Configuration>
 "@ | Out-File $configurationXMLFile
 
-            Write-Log "Running the Office Deployment Tool..."
-            Start-Process $odtFile -ArgumentList "/quiet /extract:$odtPath" -Wait
+        Write-Log "Running the Office Deployment Tool..."
+        Start-Process $odtFile -ArgumentList "/quiet /extract:$odtPath" -Wait
 
-            Write-Log "Downloading and installing Microsoft Office..."
-            Start-Process "$odtPath\Setup.exe" -ArgumentList "/configure `"$configurationXMLFile`"" -Wait -PassThru
+        Write-Log "Downloading and installing Microsoft Office..."
+        Start-Process "$odtPath\Setup.exe" -ArgumentList "/configure `"$configurationXMLFile`"" -Wait -PassThru
 
-            Write-Log "Microsoft Office installation completed successfully."
+        Write-Log "Microsoft Office installation completed successfully."
 
-            # Clean up the extracted files and the zip file
-            Remove-Item $odtFile
-            Remove-Item $configurationXMLFile
-        } else {
-            Write-Log "Microsoft Office not installed. Missing configuration."
-        }
+        # Clean up the extracted files and the zip file
+        Remove-Item $odtFile
+        Remove-Item $configurationXMLFile
     } catch {
         Write-Log "Error installing Microsoft Office: $($_.Exception.Message)"
         exit 1
@@ -289,7 +304,7 @@ function Install-Office {
 # Function to set wallpaper
 function Set-Wallpaper {
     try {
-        $wallpaperPath = Get-ConfigValue -section "Backgrounds" -key "WallpaperPath"
+        $wallpaperPath = Get-ConfigValue -section "Theme" -key "WallpaperPath"
         if ($wallpaperPath) {
             $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion"
             $registryKey = "PersonalizationCSP"
@@ -325,7 +340,7 @@ function Set-Wallpaper {
 # Function to set lock screen image
 function Set-LockScreenImage {
     try {
-        $lockScreenPath = Get-ConfigValue -section "Backgrounds" -key "LockScreenPath"
+        $lockScreenPath = Get-ConfigValue -section "Theme" -key "LockScreenPath"
         if ($lockScreenPath) {
             $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion"
             $registryKey = "PersonalizationCSP"
@@ -593,13 +608,14 @@ function Install-ChromeEnterprise {
 
 # Function to install GCPW
 function Install-GCPW {
-    $domainsAllowedToLogin = Get-ConfigValue -section "GoogleGCPW" -key "DomainsAllowedToLogin"
-    $googleEnrollmentToken = Get-ConfigValue -section "GoogleGCPW" -key "EnrollmentToken"
-
-    if (-not $domainsAllowedToLogin) {
-        Write-Log 'The list of domains cannot be empty! Please edit the INI file.'
+    $requiredKeys = @("DomainsAllowedToLogin", "EnrollmentToken")
+    if (-not (Validate-RequiredKeys -section "GoogleGCPW" -requiredKeys $requiredKeys)) {
+        Write-Log "Skipping GCPW installation due to missing keys."
         return
     }
+
+    $domainsAllowedToLogin = Get-ConfigValue -section "GoogleGCPW" -key "DomainsAllowedToLogin"
+    $googleEnrollmentToken = Get-ConfigValue -section "GoogleGCPW" -key "EnrollmentToken"
 
     $gcpwFileName = if ([Environment]::Is64BitOperatingSystem) {
         'gcpwstandaloneenterprise64.msi'
@@ -749,12 +765,12 @@ try {
     exit 1
 }
 
+# Execute functions
 Set-ComputerName
 Set-Locale
 Set-Timezone
 Install-Applications
 Install-Fonts
-Install-Office
 Set-Wallpaper
 Set-LockScreenImage
 Add-RegistryEntries
@@ -765,9 +781,9 @@ Set-SoftwareUpdates
 Set-SecuritySettings
 Set-EnvironmentVariables
 Import-Tasks
-
-Install-ChromeEnterprise
+Install-Office
 Install-GCPW
+Install-ChromeEnterprise
 Install-GoogleDrive
 
 Write-Log "System configuration completed successfully."
