@@ -1,0 +1,40 @@
+# WinForge Configuration Script Knowledge Base
+
+## [System]
+- **ComputerName**: Desired computer name. Example: `"MyComputer"`
+- **Locale**: Locale code. Example: `"en-US"`. [List of Locale Codes](https://docs.microsoft.com/en-us/bingmaps/rest-services/common-parameters-and-types/supported-culture-codes)
+- **Timezone**: Timezone ID. Example: `"Pacific Standard Time"`. [List of Time Zones](https://docs.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones)
+
+## [Applications]
+- **Apps**: Comma-separated list of applications to install via winget. Example: `"notepad++,googlechrome,vlc"`. Use the exact ID of the application in winget.
+
+## [Fonts]
+- **Fonts**: Comma-separated list of fonts to install from Google Fonts. Example: `"Roboto,OpenSans,Lato"`
+
+## [Office]
+- **LicenseKey**: Office license key. Example: `"XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"`
+- **ProductID**: Office product ID. Examples:
+  - `"ProPlus2019Retail"`
+  - `"ProPlus2021Retail"`
+  - `"ProPlus2016Retail"`
+  - `"O365ProPlusRetail"`
+- **LanguageID**: Language ID. Example: `"en-US"`
+- **UpdatesEnabled**: Enable or disable updates. Options: `"TRUE"`, `"FALSE"`
+- **DisplayLevel**: Display level. Options: `"Full"`, `"None"`
+- **SetupReboot**: Setup reboot option. Options: `"Never"`, `"Always"`, `"IfRequired"`
+- **Channel**: Update channel. Options:
+  - `"Current"`
+  - `"MonthlyEnterprise"`
+  - `"SemiAnnual"`
+  - `"SemiAnnualTargeted"`
+- **OfficeClientEdition**: Office client edition. Options: `"32"`, `"64"`
+
+## [Backgrounds]
+- **WallpaperPath**: Path to the wallpaper image. Example: `"C:\Path\To\Wallpaper.jpg"`
+- **LockScreenPath**: Path to the lock screen image. Example: `"C:\Path\To\LockScreen.jpg"`
+
+## [Registry Add]
+- **KeyName**: Registry key path. Example: `"HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System, Value=DisableLockScreenAppNotifications, Type=REG_DWORD, Data=1"`
+- **Value**: Registry value name.
+- **Type**: Registry value type. Example: `"REG_DWORD"`
+- **Data**:
