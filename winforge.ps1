@@ -204,6 +204,7 @@ function Test-FontInstalled {
     return $isFontInstalled
 }
 
+
 # Function to install Google fonts
 function Install-Fonts {
     try {
@@ -226,20 +227,19 @@ function Install-Fonts {
 
                 $downloadedFontFolder = "$tempDownloadFolder\$fontName"
 
-                try {
-                    $fontNameEncoded = [System.Web.HttpUtility]::UrlEncode($fontName)
-                    $fontUrl = "https://fonts.google.com/download?family=$fontNameEncoded"
-                    Invoke-WebRequest -UseBasicParsing -Uri $fontUrl -OutFile "$tempDownloadFolder\$fontName.zip"
-                    Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
-                } catch {
-                    Write-Log "Error downloading or extracting font ${fontName}: $($_.Exception.Message)"
-                    continue
-                }
-
-                $allFonts = Get-ChildItem -Path $downloadedFontFolder -Include *.fon, *.otf, *.ttc, *.ttf -Recurse
-                
                 Write-Log "Downloading & Installing ${fontName} from Google Fonts. Please wait..."
 
+                Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$fontName" -OutFile "$tempDownloadFolder\$fontName.zip"
+
+                try {
+                    Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
+                } catch {
+                    Write-Log "Error downloading or extracting font $fontName: $($_.Exception.Message)"
+                    continue
+                }
+                
+                $allFonts = Get-ChildItem -Path $downloadedFontFolder -Include *.fon, *.otf, *.ttc, *.ttf -Recurse
+                
                 try {
                     foreach ($font in $allFonts) {
                         $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
@@ -266,8 +266,6 @@ function Install-Fonts {
         exit 1
     }
 }
-
-
 
 
 # Function to install Microsoft Office
@@ -424,19 +422,20 @@ function Add-RegistryEntries {
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
-            foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
-                if ($entry.Length -ne 4) {
-                    Write-Log "Invalid registry entry format: $($registrySection[$key])"
+            foreach ($entry in $registrySection.Values) {
+                $parts = $entry -split ","
+                if ($parts.Length -ne 4) {
+                    Write-Log "Invalid registry entry format: $entry"
                     continue
                 }
-                $keyName = $entry[0].Trim()
-                $value = $entry[1].Trim()
-                $type = $entry[2].Trim()
-                $data = $entry[3].Trim()
+
+                $keyName = $parts[0].Trim()
+                $value = $parts[1].Trim()
+                $type = $parts[2].Trim()
+                $data = $parts[3].Trim()
 
                 Write-Log "Adding registry entry: ${keyName}, ${value}, ${type}, ${data}"
-                cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
+                cmd.exe /c "reg add `"$keyName`" /v `"$value`" /t $type /d `"$data`" /f"
             }
             Write-Log "Registry entries added successfully."
         } else {
@@ -449,23 +448,23 @@ function Add-RegistryEntries {
 }
 
 
-
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
-            foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
-                if ($entry.Length -ne 2) {
-                    Write-Log "Invalid registry entry format: $($registrySection[$key])"
+            foreach ($entry in $registrySection.Values) {
+                $parts = $entry -split ","
+                if ($parts.Length -ne 2) {
+                    Write-Log "Invalid registry entry format: $entry"
                     continue
                 }
-                $keyName = $entry[0].Trim()
-                $value = $entry[1].Trim()
+
+                $keyName = $parts[0].Trim()
+                $value = $parts[1].Trim()
 
                 Write-Log "Removing registry entry: ${keyName}, ${value}"
-                cmd.exe /c "reg delete ${keyName} /v ${value} /f"
+                cmd.exe /c "reg delete `"$keyName`" /v `"$value`" /f"
             }
             Write-Log "Registry entries removed successfully."
         } else {
@@ -478,6 +477,15 @@ function Remove-RegistryEntries {
 }
 
 
+# Helper function to convert subnet mask to prefix length
+function Convert-SubnetMaskToPrefixLength {
+    param (
+        [string]$subnetMask
+    )
+    $binaryMask = $subnetMask.Split('.') | ForEach-Object { [Convert]::ToString($_, 2).PadLeft(8, '0') } -join ''
+    return ($binaryMask -split '0')[0].Length
+}
+
 # Function to configure network settings
 function Set-NetworkSettings {
     try {
@@ -488,8 +496,9 @@ function Set-NetworkSettings {
         $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
 
         if ($ipAddress -and $subnetMask -and $gateway -and $dns1) {
+            $prefixLength = Convert-SubnetMaskToPrefixLength -subnetMask $subnetMask
             Write-Log "Configuring network settings..."
-            New-NetIPAddress -IPAddress $ipAddress -PrefixLength $subnetMask -DefaultGateway $gateway
+            New-NetIPAddress -IPAddress $ipAddress -PrefixLength $prefixLength -DefaultGateway $gateway
             Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses ($dns1, $dns2)
             Write-Log "Network settings configured successfully."
         } else {
@@ -500,6 +509,7 @@ function Set-NetworkSettings {
         exit 1
     }
 }
+
 
 # Function to configure power settings
 function Set-PowerSettings {
