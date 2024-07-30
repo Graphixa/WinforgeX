@@ -126,17 +126,22 @@ function Set-Locale {
 }
 
 # Function to set timezone
-function Set-Timezone {
+function Set-SystemTimezone {
     try {
         $timezone = Get-ConfigValue -section "System" -key "Timezone"
         if ($timezone) {
-            Write-Log "Setting timezone to: $timezone"
-            $currentTZ = Get-TimeZone
-            if ($currentTZ.Id -ne $timezone) {
+            $currentTZ = (Get-TimeZone).Id
+            if ($currentTZ -ne $timezone) {
+                Write-Log "Setting timezone to: $timezone"
                 Set-TimeZone -Id $timezone
-                Write-Log "Timezone set successfully."
+                $currentTZ = (Get-TimeZone).Id
+                if ($currentTZ -eq $timezone) {
+                    Write-Log "Timezone set successfully to: $timezone"
+                } else {
+                    Write-Log "Failed to set timezone to: $timezone"
+                }
             } else {
-                Write-Log "Timezone is already set to $timezone."
+                Write-Log "Timezone is already set to: $timezone"
             }
         } else {
             Write-Log "Timezone not set. Missing configuration."
@@ -146,7 +151,6 @@ function Set-Timezone {
         exit 1
     }
 }
-
 
 # Function to install applications via winget
 function Install-Applications {
@@ -795,7 +799,7 @@ try {
 # Execute functions
 Set-ComputerName
 Set-Locale
-Set-Timezone
+Set-SystemTimezone
 Install-Applications
 Install-Fonts
 Set-Wallpaper
