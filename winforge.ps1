@@ -210,36 +210,26 @@ function Install-Fonts {
     try {
         $fonts = Get-ConfigValue -section "Fonts" -key "Fonts"
         if ($fonts) {
-            $fontsList = $fonts -split ','
+            $fontsList = $fonts -split ',' | ForEach-Object { $_.Trim('"') }
             $ProgressPreference = 'SilentlyContinue'
             $tempDownloadFolder = "$env:TEMP\google_fonts"
 
             New-Item -Path $tempDownloadFolder -ItemType Directory -Force | Out-Null
 
             foreach ($fontName in $fontsList) {
-                $fontName = $fontName.Trim('"')  # Remove any surrounding quotes
                 # Check if the font is already installed
                 $isFontInstalled = Test-FontInstalled -FontName $fontName
 
                 if ($isFontInstalled) {
-                    Write-Log "Font ${fontName} is already installed. Skipping download and installation."
+                    Write-Log "Font $fontName is already installed. Skipping download and installation."
                     continue
                 }
 
-                $encodedFontName = [System.Net.WebUtility]::UrlEncode($fontName)
                 $downloadedFontFolder = "$tempDownloadFolder\$fontName"
 
-                Write-Log "Downloading & Installing ${fontName} from Google Fonts. Please wait..."
-
-                Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$encodedFontName" -OutFile "$tempDownloadFolder\$fontName.zip"
-
-                try {
-                    Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
-                } catch {
-                    Write-Log "Error downloading or extracting font ${fontName}: $($_.Exception.Message)"
-                    continue
-                }
-                
+                Write-Log "Downloading & Installing $fontName from Google Fonts. Please wait..."
+                Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$fontName" -OutFile "$tempDownloadFolder\$fontName.zip"
+                Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
                 $allFonts = Get-ChildItem -Path $downloadedFontFolder -Include *.fon, *.otf, *.ttc, *.ttf -Recurse
                 
                 try {
@@ -249,9 +239,9 @@ function Install-Fonts {
                         Copy-Item -Path $font.FullName -Destination $fontDestination -Force
                         New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -PropertyType String -Force | Out-Null
                     }
-                    Write-Log "Font installed: ${fontName}"
+                    Write-Log "Font installed: $fontName"
                 } catch {
-                    Write-Log "Error installing font ${fontName}: $($_.Exception.Message)"
+                    Write-Log "Error installing font $fontName : $($_.Exception.Message)"
                     exit 1
                 }
 
@@ -268,6 +258,8 @@ function Install-Fonts {
         exit 1
     }
 }
+
+
 
 
 
@@ -425,16 +417,19 @@ function Add-RegistryEntries {
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
-            foreach ($entry in $registrySection.Values) {
-                $parts = $entry -split ","
-                if ($parts.Length -ne 4) {
-                    Write-Log "Invalid registry entry format: $entry"
-                    continue
-                }
-                $keyName, $value, $type, $data = $parts
+            foreach ($key in $registrySection.Keys) {
+                $entry = $registrySection[$key] -split ","
+                if ($entry.Length -eq 4) {
+                    $keyName = $entry[0].Trim()
+                    $value = $entry[1].Trim()
+                    $type = $entry[2].Trim()
+                    $data = $entry[3].Trim()
 
-                Write-Log "Adding registry entry: Key=${keyName}, Value=${value}, Type=${type}, Data=${data}"
-                cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
+                    Write-Log "Adding registry entry: KeyName=${keyName}, Value=${value}, Type=${type}, Data=${data}"
+                    cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
+                } else {
+                    Write-Log "Invalid registry entry format: $key"
+                }
             }
             Write-Log "Registry entries added successfully."
         } else {
@@ -451,16 +446,17 @@ function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
-            foreach ($entry in $registrySection.Values) {
-                $parts = $entry -split ","
-                if ($parts.Length -ne 2) {
-                    Write-Log "Invalid registry entry format: $entry"
-                    continue
-                }
-                $keyName, $value = $parts
+            foreach ($key in $registrySection.Keys) {
+                $entry = $registrySection[$key] -split ","
+                if ($entry.Length -eq 2) {
+                    $keyName = $entry[0].Trim()
+                    $value = $entry[1].Trim()
 
-                Write-Log "Removing registry entry: Key=${keyName}, Value=${value}"
-                cmd.exe /c "reg delete ${keyName} /v ${value} /f"
+                    Write-Log "Removing registry entry: KeyName=${keyName}, Value=${value}"
+                    cmd.exe /c "reg delete ${keyName} /v ${value} /f"
+                } else {
+                    Write-Log "Invalid registry entry format: $key"
+                }
             }
             Write-Log "Registry entries removed successfully."
         } else {
@@ -473,21 +469,31 @@ function Remove-RegistryEntries {
 }
 
 
+
 # Function to configure network settings
 function Set-NetworkSettings {
     try {
+        $interfaceAlias = Get-ConfigValue -section "Network" -key "InterfaceAlias"
+        $type = Get-ConfigValue -section "Network" -key "Type"
         $ipAddress = Get-ConfigValue -section "Network" -key "IPAddress"
         $subnetMask = Get-ConfigValue -section "Network" -key "SubnetMask"
         $gateway = Get-ConfigValue -section "Network" -key "Gateway"
         $dns1 = Get-ConfigValue -section "Network" -key "DNS1"
         $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
 
-        if ($ipAddress -and $subnetMask -and $gateway -and $dns1) {
-            Write-Log "Configuring network settings..."
-            $prefixLength = ConvertTo-PrefixLength -SubnetMask $subnetMask
-            New-NetIPAddress -IPAddress $ipAddress -PrefixLength $prefixLength -DefaultGateway $gateway
-            Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses @($dns1, $dns2)
-            Write-Log "Network settings configured successfully."
+        if ($interfaceAlias -and $type) {
+            Write-Log "Configuring network settings for $interfaceAlias as $type..."
+            if ($type -eq "Static" -and $ipAddress -and $subnetMask -and $gateway -and $dns1) {
+                $prefixLength = ([System.Net.IPNetwork]::Parse("$ipAddress/$subnetMask")).PrefixLength
+                New-NetIPAddress -InterfaceAlias $interfaceAlias -IPAddress $ipAddress -PrefixLength $prefixLength -DefaultGateway $gateway
+                Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses ($dns1, $dns2)
+                Write-Log "Network settings configured successfully."
+            } elseif ($type -eq "DHCP") {
+                Set-NetIPInterface -InterfaceAlias $interfaceAlias -DHCP Enabled
+                Write-Log "Network interface configured to use DHCP."
+            } else {
+                Write-Log "Invalid network configuration. Please check the INI file."
+            }
         } else {
             Write-Log "Network settings not set. Missing configuration."
         }
@@ -496,6 +502,7 @@ function Set-NetworkSettings {
         exit 1
     }
 }
+
 
 # Function to convert subnet mask to prefix length
 function ConvertTo-PrefixLength {
