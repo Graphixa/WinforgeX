@@ -161,7 +161,8 @@ function Install-Applications {
             Write-Log "Installing applications: $apps"
             foreach ($app in $appList) {
                 try {
-                    $isAppInstalled = winget list --id $app | Select-String -Pattern $app
+                    $escapedApp = [regex]::Escape($app)
+                    $isAppInstalled = winget list | Select-String -Pattern $escapedApp
                     if ($isAppInstalled) {
                         Write-Log "Application $app is already installed. Skipping installation."
                     } else {
@@ -181,6 +182,7 @@ function Install-Applications {
         exit 1
     }
 }
+
 
 
 # Function to test if a font is installed
@@ -262,6 +264,7 @@ function Install-Fonts {
         exit 1
     }
 }
+
 
 
 # Function to install Microsoft Office
@@ -402,6 +405,10 @@ function Add-RegistryEntries {
         if ($registrySection) {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
+                if ($entry.Length -ne 4) {
+                    Write-Log "Invalid registry entry format: $($registrySection[$key])"
+                    continue
+                }
                 $keyName = $entry[0].Trim()
                 $value = $entry[1].Trim()
                 $type = $entry[2].Trim()
@@ -419,6 +426,7 @@ function Add-RegistryEntries {
         exit 1
     }
 }
+
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
