@@ -227,7 +227,9 @@ function Install-Fonts {
                 $downloadedFontFolder = "$tempDownloadFolder\$fontName"
 
                 try {
-                    Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$fontName" -OutFile "$tempDownloadFolder\$fontName.zip"
+                    $fontNameEncoded = [System.Web.HttpUtility]::UrlEncode($fontName)
+                    $fontUrl = "https://fonts.google.com/download?family=$fontNameEncoded"
+                    Invoke-WebRequest -UseBasicParsing -Uri $fontUrl -OutFile "$tempDownloadFolder\$fontName.zip"
                     Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
                 } catch {
                     Write-Log "Error downloading or extracting font ${fontName}: $($_.Exception.Message)"
@@ -264,6 +266,7 @@ function Install-Fonts {
         exit 1
     }
 }
+
 
 
 
@@ -331,6 +334,14 @@ function Set-Wallpaper {
     try {
         $wallpaperPath = Get-ConfigValue -section "Theme" -key "WallpaperPath"
         if ($wallpaperPath) {
+            # Check if the path is a URL
+            if ($wallpaperPath -match "^https?://") {
+                $tempWallpaperPath = "$env:TEMP\wallpaper.jpg"
+                Write-Log "Downloading wallpaper from: $wallpaperPath"
+                Invoke-WebRequest -Uri $wallpaperPath -OutFile $tempWallpaperPath
+                $wallpaperPath = $tempWallpaperPath
+            }
+
             $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion"
             $registryKey = "PersonalizationCSP"
             $registryFullPath = "$registryPath\$registryKey"
@@ -362,11 +373,20 @@ function Set-Wallpaper {
     }
 }
 
+
 # Function to set lock screen image
 function Set-LockScreenImage {
     try {
         $lockScreenPath = Get-ConfigValue -section "Theme" -key "LockScreenPath"
         if ($lockScreenPath) {
+            # Check if the path is a URL
+            if ($lockScreenPath -match "^https?://") {
+                $tempLockScreenPath = "$env:TEMP\lockscreen.jpg"
+                Write-Log "Downloading lock screen image from: $lockScreenPath"
+                Invoke-WebRequest -Uri $lockScreenPath -OutFile $tempLockScreenPath
+                $lockScreenPath = $tempLockScreenPath
+            }
+
             $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion"
             $registryKey = "PersonalizationCSP"
             $registryFullPath = "$registryPath\$registryKey"
@@ -398,6 +418,7 @@ function Set-LockScreenImage {
     }
 }
 
+
 # Function to add registry entries
 function Add-RegistryEntries {
     try {
@@ -428,6 +449,7 @@ function Add-RegistryEntries {
 }
 
 
+
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
@@ -435,6 +457,10 @@ function Remove-RegistryEntries {
         if ($registrySection) {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
+                if ($entry.Length -ne 2) {
+                    Write-Log "Invalid registry entry format: $($registrySection[$key])"
+                    continue
+                }
                 $keyName = $entry[0].Trim()
                 $value = $entry[1].Trim()
 
@@ -450,6 +476,7 @@ function Remove-RegistryEntries {
         exit 1
     }
 }
+
 
 # Function to configure network settings
 function Set-NetworkSettings {
