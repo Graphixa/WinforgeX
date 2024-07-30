@@ -234,7 +234,7 @@ function Install-Fonts {
                 try {
                     Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
                 } catch {
-                    Write-Log "Error downloading or extracting font $fontName: $($_.Exception.Message)"
+                    Write-Log "Error downloading or extracting font ${fontName}: $($_.Exception.Message)"
                     continue
                 }
                 
@@ -266,6 +266,7 @@ function Install-Fonts {
         exit 1
     }
 }
+
 
 
 # Function to install Microsoft Office
