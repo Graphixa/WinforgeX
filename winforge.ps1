@@ -217,6 +217,7 @@ function Install-Fonts {
             New-Item -Path $tempDownloadFolder -ItemType Directory -Force | Out-Null
 
             foreach ($fontName in $fontsList) {
+                $fontName = $fontName.Trim('"')  # Remove any surrounding quotes
                 # Check if the font is already installed
                 $isFontInstalled = Test-FontInstalled -FontName $fontName
 
@@ -225,11 +226,12 @@ function Install-Fonts {
                     continue
                 }
 
+                $encodedFontName = [System.Web.HttpUtility]::UrlEncode($fontName)
                 $downloadedFontFolder = "$tempDownloadFolder\$fontName"
 
                 Write-Log "Downloading & Installing ${fontName} from Google Fonts. Please wait..."
 
-                Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$fontName" -OutFile "$tempDownloadFolder\$fontName.zip"
+                Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$encodedFontName" -OutFile "$tempDownloadFolder\$fontName.zip"
 
                 try {
                     Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
@@ -266,6 +268,7 @@ function Install-Fonts {
         exit 1
     }
 }
+
 
 
 
@@ -429,14 +432,10 @@ function Add-RegistryEntries {
                     Write-Log "Invalid registry entry format: $entry"
                     continue
                 }
+                $keyName, $value, $type, $data = $parts
 
-                $keyName = $parts[0].Trim()
-                $value = $parts[1].Trim()
-                $type = $parts[2].Trim()
-                $data = $parts[3].Trim()
-
-                Write-Log "Adding registry entry: ${keyName}, ${value}, ${type}, ${data}"
-                cmd.exe /c "reg add `"$keyName`" /v `"$value`" /t $type /d `"$data`" /f"
+                Write-Log "Adding registry entry: Key=${keyName}, Value=${value}, Type=${type}, Data=${data}"
+                cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
             }
             Write-Log "Registry entries added successfully."
         } else {
@@ -447,7 +446,6 @@ function Add-RegistryEntries {
         exit 1
     }
 }
-
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
@@ -460,12 +458,10 @@ function Remove-RegistryEntries {
                     Write-Log "Invalid registry entry format: $entry"
                     continue
                 }
+                $keyName, $value = $parts
 
-                $keyName = $parts[0].Trim()
-                $value = $parts[1].Trim()
-
-                Write-Log "Removing registry entry: ${keyName}, ${value}"
-                cmd.exe /c "reg delete `"$keyName`" /v `"$value`" /f"
+                Write-Log "Removing registry entry: Key=${keyName}, Value=${value}"
+                cmd.exe /c "reg delete ${keyName} /v ${value} /f"
             }
             Write-Log "Registry entries removed successfully."
         } else {
@@ -497,10 +493,9 @@ function Set-NetworkSettings {
         $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
 
         if ($ipAddress -and $subnetMask -and $gateway -and $dns1) {
-            $prefixLength = Convert-SubnetMaskToPrefixLength -subnetMask $subnetMask
             Write-Log "Configuring network settings..."
-            New-NetIPAddress -IPAddress $ipAddress -PrefixLength $prefixLength -DefaultGateway $gateway
-            Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses ($dns1, $dns2)
+            New-NetIPAddress -IPAddress $ipAddress -PrefixLength (ConvertTo-SubnetMask -SubnetMask $subnetMask) -DefaultGateway $gateway
+            Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses @($dns1, $dns2)
             Write-Log "Network settings configured successfully."
         } else {
             Write-Log "Network settings not set. Missing configuration."
@@ -510,6 +505,16 @@ function Set-NetworkSettings {
         exit 1
     }
 }
+
+# Function to convert subnet mask to prefix length
+function ConvertTo-SubnetMask {
+    param (
+        [string]$SubnetMask
+    )
+    $binaryMask = [convert]::ToString(([ipaddress]$SubnetMask).Address, 2)
+    return ($binaryMask -replace '0', '').Length
+}
+
 
 
 # Function to configure power settings
