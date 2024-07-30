@@ -161,8 +161,13 @@ function Install-Applications {
             Write-Log "Installing applications: $apps"
             foreach ($app in $appList) {
                 try {
-                    winget install $app -e --id $app -h
-                    Write-Log "Application installed: $app"
+                    $isAppInstalled = winget list --id $app | Select-String -Pattern $app
+                    if ($isAppInstalled) {
+                        Write-Log "Application $app is already installed. Skipping installation."
+                    } else {
+                        winget install $app -e --id $app -h
+                        Write-Log "Application installed: $app"
+                    }
                 } catch {
                     Write-Log "Error installing application ${app}: $($_.Exception.Message)"
                 }
@@ -176,6 +181,7 @@ function Install-Applications {
         exit 1
     }
 }
+
 
 # Function to test if a font is installed
 function Test-FontInstalled {
@@ -218,8 +224,14 @@ function Install-Fonts {
 
                 $downloadedFontFolder = "$tempDownloadFolder\$fontName"
 
-                Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$fontName" -OutFile "$tempDownloadFolder\$fontName.zip"
-                Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
+                try {
+                    Invoke-WebRequest -UseBasicParsing -Uri "https://fonts.google.com/download?family=$fontName" -OutFile "$tempDownloadFolder\$fontName.zip"
+                    Expand-Archive -Path "$tempDownloadFolder\$fontName.zip" -DestinationPath $downloadedFontFolder -Force | Out-Null
+                } catch {
+                    Write-Log "Error downloading or extracting font ${fontName}: $($_.Exception.Message)"
+                    continue
+                }
+
                 $allFonts = Get-ChildItem -Path $downloadedFontFolder -Include *.fon, *.otf, *.ttc, *.ttf -Recurse
                 
                 Write-Log "Downloading & Installing ${fontName} from Google Fonts. Please wait..."
@@ -230,7 +242,6 @@ function Install-Fonts {
                                 
                         Copy-Item -Path $font.FullName -Destination $fontDestination -Force
                         New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -PropertyType String -Force | Out-Null
-                               
                     }
                     Write-Log "Font installed: ${fontName}"
                 } catch {
@@ -251,6 +262,7 @@ function Install-Fonts {
         exit 1
     }
 }
+
 
 # Function to install Microsoft Office
 function Install-Office {
