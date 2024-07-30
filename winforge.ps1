@@ -131,8 +131,13 @@ function Set-Timezone {
         $timezone = Get-ConfigValue -section "System" -key "Timezone"
         if ($timezone) {
             Write-Log "Setting timezone to: $timezone"
-            Set-TimeZone -Id $timezone
-            Write-Log "Timezone set successfully."
+            $currentTZ = Get-TimeZone
+            if ($currentTZ.Id -ne $timezone) {
+                Set-TimeZone -Id $timezone
+                Write-Log "Timezone set successfully."
+            } else {
+                Write-Log "Timezone is already set to $timezone."
+            }
         } else {
             Write-Log "Timezone not set. Missing configuration."
         }
@@ -141,6 +146,7 @@ function Set-Timezone {
         exit 1
     }
 }
+
 
 # Function to install applications via winget
 function Install-Applications {
