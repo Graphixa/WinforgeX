@@ -226,7 +226,7 @@ function Install-Fonts {
                     continue
                 }
 
-                $encodedFontName = [System.Web.HttpUtility]::UrlEncode($fontName)
+                $encodedFontName = [System.Net.WebUtility]::UrlEncode($fontName)
                 $downloadedFontFolder = "$tempDownloadFolder\$fontName"
 
                 Write-Log "Downloading & Installing ${fontName} from Google Fonts. Please wait..."
@@ -268,7 +268,6 @@ function Install-Fonts {
         exit 1
     }
 }
-
 
 
 
@@ -500,16 +499,6 @@ function Set-NetworkSettings {
 
 # Function to convert subnet mask to prefix length
 function ConvertTo-PrefixLength {
-    param (
-        [string]$SubnetMask
-    )
-    $binaryMask = [convert]::ToString(([ipaddress]$SubnetMask).Address, 2)
-    return ($binaryMask -replace '0', '').Length
-}
-
-
-# Function to convert subnet mask to prefix length
-function ConvertTo-SubnetMask {
     param (
         [string]$SubnetMask
     )
