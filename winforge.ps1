@@ -95,7 +95,7 @@ function Set-ComputerName {
         $computerName = Get-ConfigValue -section "System" -key "ComputerName"
         if ($computerName) {
             Write-Log "Setting computer name to: $computerName"
-            Rename-Computer -NewName $computerName -Force -Restart
+            Rename-Computer -NewName $computerName -Force
             Write-Log "Computer name set successfully."
         } else {
             Write-Log "Computer name not set. Missing configuration."
