@@ -474,15 +474,6 @@ function Remove-RegistryEntries {
 }
 
 
-# Helper function to convert subnet mask to prefix length
-function Convert-SubnetMaskToPrefixLength {
-    param (
-        [string]$subnetMask
-    )
-    $binaryMask = $subnetMask.Split('.') | ForEach-Object { [Convert]::ToString($_, 2).PadLeft(8, '0') } -join ''
-    return ($binaryMask -split '0')[0].Length
-}
-
 # Function to configure network settings
 function Set-NetworkSettings {
     try {
@@ -494,7 +485,8 @@ function Set-NetworkSettings {
 
         if ($ipAddress -and $subnetMask -and $gateway -and $dns1) {
             Write-Log "Configuring network settings..."
-            New-NetIPAddress -IPAddress $ipAddress -PrefixLength (ConvertTo-SubnetMask -SubnetMask $subnetMask) -DefaultGateway $gateway
+            $prefixLength = ConvertTo-PrefixLength -SubnetMask $subnetMask
+            New-NetIPAddress -IPAddress $ipAddress -PrefixLength $prefixLength -DefaultGateway $gateway
             Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses @($dns1, $dns2)
             Write-Log "Network settings configured successfully."
         } else {
@@ -505,6 +497,16 @@ function Set-NetworkSettings {
         exit 1
     }
 }
+
+# Function to convert subnet mask to prefix length
+function ConvertTo-PrefixLength {
+    param (
+        [string]$SubnetMask
+    )
+    $binaryMask = [convert]::ToString(([ipaddress]$SubnetMask).Address, 2)
+    return ($binaryMask -replace '0', '').Length
+}
+
 
 # Function to convert subnet mask to prefix length
 function ConvertTo-SubnetMask {
