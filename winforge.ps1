@@ -204,8 +204,7 @@ function Test-FontInstalled {
     return $isFontInstalled
 }
 
-
-# Function to install Google fonts
+# Function to install Google fonts from GitHub repository
 function Install-Fonts {
     try {
         $fonts = Get-ConfigValue -section "Fonts" -key "Fonts"
@@ -225,50 +224,32 @@ function Install-Fonts {
                     continue
                 }
 
-                Write-Log "Downloading & Installing $fontName from Google Fonts. Please wait..."
-                $cssUrl = "https://fonts.googleapis.com/css2?family=$fontName"
-                $cssContent = (Invoke-WebRequest -Uri $cssUrl).Content
+                Write-Log "Downloading & Installing $fontName from Google Fonts GitHub repository. Please wait..."
+                $fontUrl = "https://github.com/google/fonts/archive/refs/heads/main.zip"
+                $fontFolderUrl = "https://github.com/google/fonts/tree/main/ofl/$fontName"
 
-                # Extract font URLs from the CSS content
-                $fontUrls = @()
-                foreach ($line in $cssContent -split "`n") {
-                    if ($line -match "src: url\((https:\/\/fonts.gstatic.com\/.*?\.woff2)\)") {
-                        $fontUrls += $matches[1]
-                    }
+                # Download the font folder from GitHub
+                $zipFilePath = "$tempDownloadFolder\$fontName.zip"
+                $extractedFolderPath = "$tempDownloadFolder\fonts-main\ofl\$fontName"
+                $fontFilesPattern = "*.ttf"
+
+                Write-Log "Downloading font $fontName from: $fontFolderUrl"
+                Invoke-WebRequest -Uri $fontUrl -OutFile $zipFilePath
+                Expand-Archive -Path $zipFilePath -DestinationPath $tempDownloadFolder -Force
+
+                # Install the font files
+                $allFonts = Get-ChildItem -Path $extractedFolderPath -Include $fontFilesPattern -Recurse
+                foreach ($font in $allFonts) {
+                    $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
+                    Copy-Item -Path $font.FullName -Destination $fontDestination -Force
+                    New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -PropertyType String -Force | Out-Null
                 }
 
-                if ($fontUrls.Count -eq 0) {
-                    Write-Log "Error: No font URLs found for $fontName"
-                    continue
-                }
-
-                $downloadedFontFolder = "$tempDownloadFolder\$fontName"
-                New-Item -Path $downloadedFontFolder -ItemType Directory -Force | Out-Null
-
-                foreach ($fontUrl in $fontUrls) {
-                    $fontFileName = Split-Path -Path $fontUrl -Leaf
-                    $fontFilePath = "$downloadedFontFolder\$fontFileName"
-
-                    Write-Log "Downloading font file from: $fontUrl"
-                    Invoke-WebRequest -Uri $fontUrl -OutFile $fontFilePath
-
-                    # Convert WOFF2 to TTF if necessary
-                    if ($fontFileName -like "*.woff2") {
-                        $ttfFilePath = [System.IO.Path]::ChangeExtension($fontFilePath, ".ttf")
-                        Write-Log "Converting $fontFileName to TTF format..."
-                        woff2_decompress.exe $fontFilePath $ttfFilePath  # Ensure you have woff2_decompress.exe available
-                        Remove-Item -Path $fontFilePath -Force
-                        $fontFilePath = $ttfFilePath
-                    }
-
-                    $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath (Split-Path -Path $fontFilePath -Leaf)
-                    Copy-Item -Path $fontFilePath -Destination $fontDestination -Force
-                    New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name (Split-Path -Path $fontFilePath -Leaf) -Value (Split-Path -Path $fontFilePath -Leaf) -PropertyType String -Force | Out-Null
-                }
                 Write-Log "Font installed: $fontName"
 
-                # Clean up the downloaded font files
-                Remove-Item -Path $downloadedFontFolder -Recurse -Force
+                # Clean up the downloaded font files and zip file
+                Remove-Item -Path "$tempDownloadFolder\fonts-main" -Recurse -Force
+                Remove-Item -Path $zipFilePath -Force
             }
 
             Write-Log "All fonts installed successfully."
@@ -276,10 +257,11 @@ function Install-Fonts {
             Write-Log "No fonts to install. Missing configuration."
         }
     } catch {
-        Write-Log "Error installing fonts: $($_.Exception.Message)"
+        Write-Log "Error installing fonts: $($Error[0].Exception.Message)"
         exit 1
     }
 }
+
 
 
 
