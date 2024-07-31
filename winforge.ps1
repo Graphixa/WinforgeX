@@ -593,7 +593,6 @@ function Set-WindowsUpdates {
     }
 }
 
-# Function to enable/disable services
 function Set-Services {
     try {
         $services = $config["Services"]
@@ -601,14 +600,19 @@ function Set-Services {
             foreach ($service in $services.GetEnumerator()) {
                 $serviceName = $service.Key
                 $serviceAction = $service.Value.ToLower()
-                if ($serviceAction -eq "enabled") {
-                    Write-Log "Enabling service: $serviceName"
-                    Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
-                } elseif ($serviceAction -eq "disabled") {
-                    Write-Log "Disabling service: $serviceName"
-                    Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
-                } else {
-                    Write-Log "Invalid service action for ${$serviceName}: $serviceAction"
+                try {
+                    if ($serviceAction -eq "enabled") {
+                        Write-Log "Enabling service: $serviceName"
+                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                    } elseif ($serviceAction -eq "disabled") {
+                        Write-Log "Disabling service: $serviceName"
+                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                    } else {
+                        Write-Log "Invalid service action for $($serviceName): $serviceAction"
+                    }
+                } catch {
+                    Write-Log "$serviceName could not be configured, check spelling and fix the configuration file."
+                    Write-Log "Error: $($_.Exception.Message)"
                 }
             }
             Write-Log "Service configurations applied successfully."
