@@ -224,11 +224,11 @@ function Get-Fonts {
     $fontFileLinks = $fontFilesPage.Links | Where-Object { $_.href -match "\.ttf$" -or $_.href -match "\.otf$" }
 
     foreach ($link in $fontFileLinks) {
-        $fileUrl = "https://github.com" + $link.href.Replace("blob/", "raw/")
+        $fileUrl = "https://github.com" + $link.href.Replace("/blob/", "/raw/")
         $fileName = [System.IO.Path]::GetFileName($link.href)
 
         # Download font file
-        Write-Log "Downloading $fileName..."
+        Write-Log "Downloading $fileName from: $fileUrl"
         Invoke-WebRequest -Uri $fileUrl -OutFile (Join-Path -Path $outputPath -ChildPath $fileName)
     }
 
@@ -243,8 +243,6 @@ function Install-Fonts {
             $fontsList = $fonts -split ',' | ForEach-Object { $_.Trim('"').ToLower() }
             $ProgressPreference = 'SilentlyContinue'
             $tempDownloadFolder = "$env:TEMP\google_fonts"
-
-            New-Item -Path $tempDownloadFolder -ItemType Directory -Force | Out-Null
 
             foreach ($fontName in $fontsList) {
                 # Correct the font names for the GitHub repository
@@ -286,7 +284,6 @@ function Install-Fonts {
         exit 1
     }
 }
-
 
 
 
