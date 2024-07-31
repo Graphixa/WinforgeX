@@ -1,1 +1,3 @@
-Add option in config file to choose whether to install Google Drive, Google Chrome and GCPW + enrollment token settings
+- Add option in config file to choose whether to install Google Drive, Google Chrome and GCPW + enrollment token settings
+- option to disable Start menu suggestions and windows advertising
+- Option to bring back old context menu tweak and other tweaks under a tweaks Key
