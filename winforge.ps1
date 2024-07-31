@@ -204,6 +204,37 @@ function Test-FontInstalled {
     return $isFontInstalled
 }
 
+# Function to download font files from GitHub
+function Get-Fonts {
+    param (
+        [string]$fontName,
+        [string]$outputPath
+    )
+
+    $githubUrl = "https://github.com/google/fonts"
+    $fontRepoUrl = "$githubUrl/tree/main/ofl/$fontName"
+
+    # Create output directory if it doesn't exist
+    if (-not (Test-Path -Path $outputPath)) {
+        New-Item -ItemType Directory -Path $outputPath | Out-Null
+    }
+
+    # Fetch font file URLs from GitHub
+    $fontFilesPage = Invoke-WebRequest -Uri $fontRepoUrl -UseBasicParsing
+    $fontFileLinks = $fontFilesPage.Links | Where-Object { $_.href -match "\.ttf$" -or $_.href -match "\.otf$" }
+
+    foreach ($link in $fontFileLinks) {
+        $fileUrl = "https://github.com" + $link.href.Replace("blob/", "raw/")
+        $fileName = [System.IO.Path]::GetFileName($link.href)
+
+        # Download font file
+        Write-Log "Downloading $fileName..."
+        Invoke-WebRequest -Uri $fileUrl -OutFile (Join-Path -Path $outputPath -ChildPath $fileName)
+    }
+
+    Write-Log "Download complete. Fonts saved to $outputPath"
+}
+
 # Function to install Google fonts from GitHub repository
 function Install-Fonts {
     try {
@@ -228,25 +259,12 @@ function Install-Fonts {
                 }
 
                 Write-Log "Downloading & Installing $correctFontName from Google Fonts GitHub repository. Please wait..."
-                $fontFolderUrl = "https://github.com/google/fonts/tree/main/ofl/$correctFontName"
-                $fontZipUrl = "https://github.com/google/fonts/archive/refs/heads/main.zip"
-                $zipFilePath = "$tempDownloadFolder\$correctFontName.zip"
-                $extractedFolderPath = "$tempDownloadFolder\fonts-main\ofl\$correctFontName"
-                $fontFilesPattern = "*.ttf"
 
-                # Check if the font folder exists on GitHub
-                $fontFolderExists = Invoke-WebRequest -Uri $fontFolderUrl -UseBasicParsing -Method Head -ErrorAction SilentlyContinue
-                if ($fontFolderExists.StatusCode -ne 200) {
-                    Write-Log "Font folder $correctFontName not found on GitHub. Skipping."
-                    continue
-                }
-
-                Write-Log "Downloading font $correctFontName from: $fontZipUrl"
-                Invoke-WebRequest -Uri $fontZipUrl -OutFile $zipFilePath
-                Expand-Archive -Path $zipFilePath -DestinationPath $tempDownloadFolder -Force
+                # Download the font files
+                Get-Fonts -fontName $correctFontName -outputPath $tempDownloadFolder
 
                 # Install the font files
-                $allFonts = Get-ChildItem -Path $extractedFolderPath -Include $fontFilesPattern -Recurse
+                $allFonts = Get-ChildItem -Path $tempDownloadFolder -Include *.ttf, *.otf -Recurse
                 foreach ($font in $allFonts) {
                     $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
                     Copy-Item -Path $font.FullName -Destination $fontDestination -Force
@@ -255,9 +273,8 @@ function Install-Fonts {
 
                 Write-Log "Font installed: $correctFontName"
 
-                # Clean up the downloaded font files and zip file
-                Remove-Item -Path "$tempDownloadFolder\fonts-main" -Recurse -Force
-                Remove-Item -Path $zipFilePath -Force
+                # Clean up the downloaded font files
+                Remove-Item -Path $tempDownloadFolder -Recurse -Force
             }
 
             Write-Log "All fonts installed successfully."
@@ -269,6 +286,7 @@ function Install-Fonts {
         exit 1
     }
 }
+
 
 
 
