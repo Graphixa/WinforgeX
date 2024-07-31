@@ -495,47 +495,29 @@ function Remove-RegistryEntries {
 
 
 
-# Function to configure network settings
-function Set-NetworkSettings {
+# Function to configure DNS settings
+function Set-DNSSettings {
     try {
-        $interfaceAlias = Get-ConfigValue -section "Network" -key "InterfaceAlias"
-        $type = Get-ConfigValue -section "Network" -key "Type"
-        $ipAddress = Get-ConfigValue -section "Network" -key "IPAddress"
-        $subnetMask = Get-ConfigValue -section "Network" -key "SubnetMask"
-        $gateway = Get-ConfigValue -section "Network" -key "Gateway"
         $dns1 = Get-ConfigValue -section "Network" -key "DNS1"
         $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
+        $interfaceAlias = "Ethernet"  # or use a specific alias if needed
 
-        if ($interfaceAlias -and $type) {
-            Write-Log "Configuring network settings for $interfaceAlias as $type..."
-            if ($type -eq "Static" -and $ipAddress -and $subnetMask -and $gateway -and $dns1) {
-                $prefixLength = ([System.Net.IPNetwork]::Parse("$ipAddress/$subnetMask")).PrefixLength
-                New-NetIPAddress -InterfaceAlias $interfaceAlias -IPAddress $ipAddress -PrefixLength $prefixLength -DefaultGateway $gateway
-                Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses ($dns1, $dns2)
-                Write-Log "Network settings configured successfully."
-            } elseif ($type -eq "DHCP") {
-                Set-NetIPInterface -InterfaceAlias $interfaceAlias -DHCP Enabled
-                Write-Log "Network interface configured to use DHCP."
-            } else {
-                Write-Log "Invalid network configuration. Please check the INI file."
-            }
-        } else {
-            Write-Log "Network settings not set. Missing configuration."
+        if ($dns1) {
+            Write-Log "Setting primary DNS to: $dns1"
+            Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses $dns1
         }
+
+        if ($dns2) {
+            Write-Log "Setting secondary DNS to: $dns2"
+            $currentDNS = (Get-DnsClientServerAddress -InterfaceAlias $interfaceAlias).ServerAddresses
+            Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses ($currentDNS + $dns2)
+        }
+
+        Write-Log "DNS settings configured successfully."
     } catch {
-        Write-Log "Error configuring network settings: $($_.Exception.Message)"
+        Write-Log "Error configuring DNS settings: $($_.Exception.Message)"
         exit 1
     }
-}
-
-
-# Function to convert subnet mask to prefix length
-function ConvertTo-PrefixLength {
-    param (
-        [string]$SubnetMask
-    )
-    $binaryMask = [convert]::ToString(([ipaddress]$SubnetMask).Address, 2)
-    return ($binaryMask -replace '0', '').Length
 }
 
 
@@ -566,27 +548,75 @@ function Set-PowerSettings {
     }
 }
 
-# Function to configure software updates
-function Set-SoftwareUpdates {
+# Function to configure Windows updates
+function Set-WindowsUpdates {
     try {
-        $autoUpdatesEnabled = Get-ConfigValue -section "WindowsUpdate" -key "AutoUpdatesEnabled"
+        $noAutoUpdate = Get-ConfigValue -section "WindowsUpdate" -key "NoAutoUpdate"
+        $auOptions = Get-ConfigValue -section "WindowsUpdate" -key "AUOptions"
+        $autoInstallMinorUpdates = Get-ConfigValue -section "WindowsUpdate" -key "AutoInstallMinorUpdates"
+        $scheduledInstallDay = Get-ConfigValue -section "WindowsUpdate" -key "ScheduledInstallDay"
+        $scheduledInstallTime = Get-ConfigValue -section "WindowsUpdate" -key "ScheduledInstallTime"
 
-        if ($autoUpdatesEnabled) {
-            Write-Log "Configuring software updates..."
-            if ($autoUpdatesEnabled -eq "TRUE") {
-                Write-Log "Enabling automatic updates..."
-                Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" -Name "AUOptions" -Value 4
-                Write-Log "Automatic updates enabled."
-            } else {
-                Write-Log "Disabling automatic updates..."
-                Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" -Name "AUOptions" -Value 1
-                Write-Log "Automatic updates disabled."
-            }
+        if ($noAutoUpdate -eq "TRUE") {
+            Write-Log "Disabling all automatic updates..."
+            Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Value 1 -Type DWord -Force
+            Write-Log "Automatic updates disabled."
         } else {
-            Write-Log "Software updates not configured. Missing configuration."
+            Write-Log "Configuring Windows updates..."
+
+            if ($auOptions -and $scheduledInstallDay -and $scheduledInstallTime) {
+                Write-Log "Setting AUOptions to: $auOptions"
+                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Value $auOptions -Type DWord -Force
+
+                Write-Log "Setting ScheduledInstallDay to: $scheduledInstallDay"
+                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallDay" -Value $scheduledInstallDay -Type DWord -Force
+
+                Write-Log "Setting ScheduledInstallTime to: $scheduledInstallTime"
+                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallTime" -Value $scheduledInstallTime -Type DWord -Force
+            } else {
+                Write-Log "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings."
+            }
+
+            if ($autoInstallMinorUpdates) {
+                $autoInstallValue = if ($autoInstallMinorUpdates -eq "TRUE") { 1 } else { 0 }
+                Write-Log "Setting AutoInstallMinorUpdates to: $autoInstallValue"
+                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AutoInstallMinorUpdates" -Value $autoInstallValue -Type DWord -Force
+            } else {
+                Write-Log "No AutoInstallMinorUpdates setting provided."
+            }
+
+            Write-Log "Windows updates configured successfully."
         }
     } catch {
-        Write-Log "Error configuring software updates: $($_.Exception.Message)"
+        Write-Log "Error configuring Windows updates: $($_.Exception.Message)"
+        exit 1
+    }
+}
+
+# Function to enable/disable services
+function Set-Services {
+    try {
+        $services = $config["Services"]
+        if ($services) {
+            foreach ($service in $services.GetEnumerator()) {
+                $serviceName = $service.Key
+                $serviceAction = $service.Value.ToLower()
+                if ($serviceAction -eq "enabled") {
+                    Write-Log "Enabling service: $serviceName"
+                    Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                } elseif ($serviceAction -eq "disabled") {
+                    Write-Log "Disabling service: $serviceName"
+                    Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                } else {
+                    Write-Log "Invalid service action for ${$serviceName}: $serviceAction"
+                }
+            }
+            Write-Log "Service configurations applied successfully."
+        } else {
+            Write-Log "No services to configure. Missing configuration."
+        }
+    } catch {
+        Write-Log "Error configuring services: $($_.Exception.Message)"
         exit 1
     }
 }
@@ -595,8 +625,12 @@ function Set-SoftwareUpdates {
 function Set-SecuritySettings {
     try {
         $uacLevel = Get-ConfigValue -section "SecuritySettings" -key "UACLevel"
-        $windowsDefenderEnabled = Get-ConfigValue -section "SecuritySettings" -key "WindowsDefenderEnabled"
+        $disableTelemetry = Get-ConfigValue -section "SecuritySettings" -key "DisableTelemetry"
+        $showFileExtensions = Get-ConfigValue -section "SecuritySettings" -key "ShowFileExtensions"
+        $disableCopilot = Get-ConfigValue -section "SecuritySettings" -key "DisableCopilot"
+        $disableOneDrive = Get-ConfigValue -section "SecuritySettings" -key "DisableOneDrive"
 
+        # Set UAC level
         if ($uacLevel) {
             Write-Log "Setting UAC level to: $uacLevel"
             Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value $uacLevel
@@ -604,24 +638,56 @@ function Set-SecuritySettings {
             Write-Log "UAC level not set. Missing configuration."
         }
 
-        if ($windowsDefenderEnabled) {
-            if ($windowsDefenderEnabled -eq "TRUE") {
-                Write-Log "Enabling Windows Defender..."
-                Set-MpPreference -DisableRealtimeMonitoring $false
-                Write-Log "Windows Defender enabled."
-            } else {
-                Write-Log "Disabling Windows Defender..."
-                Set-MpPreference -DisableRealtimeMonitoring $true
-                Write-Log "Windows Defender disabled."
+        # Disable Telemetry
+        if ($disableTelemetry -eq "TRUE") {
+            Write-Log "Disabling Windows Telemetry..."
+            $telemetryKeys = @(
+                "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection -Name AllowTelemetry -Value 0 -Type DWord",
+                "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection -Name AllowTelemetry -Value 0 -Type DWord",
+                "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection -Name MaxTelemetryAllowed -Value 0 -Type DWord"
+            )
+            foreach ($key in $telemetryKeys) {
+                $path, $name, $value, $type = $key -split " -"
+                Set-ItemProperty -Path $path -Name $name -Value $value -Type $type
             }
-        } else {
-            Write-Log "Windows Defender not configured. Missing configuration."
+            Write-Log "Windows Telemetry disabled."
         }
+
+        # Show file extensions
+        if ($showFileExtensions -eq "TRUE") {
+            Write-Log "Configuring to always display file type extensions..."
+            Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value 0
+            Write-Log "File type extensions will always be displayed."
+        }
+
+        # Disable Copilot
+        if ($disableCopilot -eq "TRUE") {
+            Write-Log "Disabling Windows Copilot..."
+            Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "CopilotEnabled" -Value 0 -Type DWord
+            Write-Log "Windows Copilot disabled."
+        }
+
+        # Disable OneDrive
+        if ($disableOneDrive -eq "TRUE") {
+            Write-Log "Disabling OneDrive..."
+            $oneDriveKeys = @(
+                "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive -Name DisableFileSyncNGSC -Value 1 -Type DWord",
+                "HKLM:\SOFTWARE\Microsoft\OneDrive -Name PreventNetworkTrafficPreWindows10Apps -Value 1 -Type DWord"
+            )
+            foreach ($key in $oneDriveKeys) {
+                $path, $name, $value, $type = $key -split " -"
+                Set-ItemProperty -Path $path -Name $name -Value $value -Type $type
+            }
+            Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
+            Write-Log "OneDrive disabled."
+        }
+
     } catch {
         Write-Log "Error configuring security settings: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 # Function to set environment variables
 function Set-EnvironmentVariables {
@@ -892,10 +958,11 @@ Set-Wallpaper
 Set-LockScreenImage
 Add-RegistryEntries
 Remove-RegistryEntries
-Set-NetworkSettings
+Set-DNSSettings
 Set-PowerSettings
-Set-SoftwareUpdates
+Set-WindowsUpdates
 Set-SecuritySettings
+Set-Services
 Set-EnvironmentVariables
 Import-Tasks
 Install-Office

@@ -1,0 +1,1 @@
+Add option in config file to choose whether to install Google Drive, Google Chrome and GCPW + enrollment token settings
