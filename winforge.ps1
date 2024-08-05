@@ -755,32 +755,43 @@ function Set-Services {
     try {
         $services = $config["Services"]
         if ($services) {
+            Show-SystemMessage -title "Configuring Services"
             foreach ($service in $services.GetEnumerator()) {
                 $serviceName = $service.Key
                 $serviceAction = $service.Value.ToLower()
                 try {
                     if ($serviceAction -eq "enabled") {
+                        Show-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
                         Write-Log "Enabling service: $serviceName"
-                        Enable-WindowsOptionalFeature -Online -FeatureName $serviceName -NoRestart
+                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                        Show-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
                     } elseif ($serviceAction -eq "disabled") {
+                        Show-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
                         Write-Log "Disabling service: $serviceName"
-                        Disable-WindowsOptionalFeature -Online -FeatureName $serviceName -NoRestart
+                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                        Show-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
                     } else {
-                        Write-Log "Invalid service action for $($serviceName): $serviceAction"
+                        Show-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg2Color "Red"
+                        Write-Log "Invalid service action for ${serviceName}: $serviceAction"
                     }
                 } catch {
-                    Write-Log "$serviceName was not found as an optional service, check spelling and fix the configuration file. Error: $($_.Exception.Message)"
+                    Show-ErrorMessage -msg "$serviceName was not found as an optional service, check spelling and fix the configuration file."
+                    Write-Log "Error configuring service ${serviceName}: $($_.Exception.Message)"
                 }
             }
             Write-Log "Service configurations applied successfully."
+            Show-SuccessMessage
         } else {
             Write-Log "No services to configure. Missing configuration."
+            Show-SystemMessage -msg1 "No services to configure. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error configuring services: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error configuring services: $($_.Exception.Message)" -colour "Red"
         exit 1
     }
 }
+
 
 
 # Function to configure security settings
