@@ -15,5 +15,7 @@ Privacy
 -
 
 
+System messages enabled for: Install-Apps and Set-Services so far
+
 
 Add app manifest option for Apps i.e. "AppManifest="www.github.com.au/applist.json""
