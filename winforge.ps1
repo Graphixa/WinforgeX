@@ -89,6 +89,82 @@ function Validate-RequiredKeys {
     return $true
 }
 
+
+function Show-SystemMessage {
+    param (
+        [Parameter()]
+        [string] $title = '',
+  
+        [Parameter()]
+        [string] $msg1 = '',
+
+        [Parameter()]
+        [string] $msg2 = '',
+  
+        [Parameter()]
+        $titleColor = 'Yellow',
+  
+        [Parameter()]
+        $msg1Color = 'Cyan',
+
+        [Parameter()]
+        $msg2color = 'White'
+    )
+    
+    
+    if ($PSBoundParameters.ContainsKey('title')) {
+        Write-Host
+        Write-Host " $title " -ForegroundColor Black -BackgroundColor $titleColor
+        Write-Host
+    }
+  
+    if ($PSBoundParameters.ContainsKey('msg1') -and $PSBoundParameters.ContainsKey('msg2')){
+        Write-Host "$msg1" -ForegroundColor $msg1Color -NoNewline; Write-Host "$msg2" -ForegroundColor $msg2color
+        return
+    }
+
+    if ($PSBoundParameters.ContainsKey('msg1')) {
+        Write-Host "$msg1" -ForegroundColor $msg1Color
+    }
+
+    if ($PSBoundParameters.ContainsKey('msg2')) {
+        Write-Host "$msg2" -ForegroundColor $msg2color
+    }
+
+}
+
+function Show-ErrorMessage {
+    param (
+      [Parameter()]
+      $msg = "CRITICAL ERROR",
+  
+      [Parameter()]
+      $colour = 'Black'
+    )
+  
+    Write-Host
+    Write-Host " $msg " -ForegroundColor $colour -BackgroundColor Red
+    Write-Host
+    Write-Host $_.Exception.Message -ForegroundColor White
+    Write-Host
+  }
+  
+function Show-SuccessMessage {
+    param (
+      [Parameter()]
+      $msg = "SUCCESS",
+  
+      [Parameter()]
+      $msgColor = 'Black'
+    )
+  
+    Write-Host
+    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor Cyan
+    Write-Host
+  }
+
+
+
 # Function to set computer name
 function Set-ComputerName {
     try {
@@ -153,35 +229,117 @@ function Set-SystemTimezone {
 }
 
 # Function to install applications via winget
+# Define the new message functions
+function Show-SystemMessage {
+    param (
+        [Parameter()]
+        [string] $title = '',
+  
+        [Parameter()]
+        [string] $msg1 = '',
+
+        [Parameter()]
+        [string] $msg2 = '',
+  
+        [Parameter()]
+        $titleColor = 'Yellow',
+  
+        [Parameter()]
+        $msg1Color = 'Cyan',
+
+        [Parameter()]
+        $msg2Color = 'White'
+    )
+    
+    if ($PSBoundParameters.ContainsKey('title')) {
+        Write-Host
+        Write-Host " $title " -ForegroundColor Black -BackgroundColor $titleColor
+        Write-Host
+    }
+  
+    if ($PSBoundParameters.ContainsKey('msg1') -and $PSBoundParameters.ContainsKey('msg2')){
+        Write-Host "$msg1" -ForegroundColor $msg1Color -NoNewline; Write-Host "$msg2" -ForegroundColor $msg2Color
+        return
+    }
+
+    if ($PSBoundParameters.ContainsKey('msg1')) {
+        Write-Host "$msg1" -ForegroundColor $msg1Color
+    }
+
+    if ($PSBoundParameters.ContainsKey('msg2')) {
+        Write-Host "$msg2" -ForegroundColor $msg2Color
+    }
+}
+
+function Show-ErrorMessage {
+    param (
+        [Parameter()]
+        $msg = "CRITICAL ERROR",
+
+        [Parameter()]
+        $colour = 'Black'
+    )
+
+    Write-Host
+    Write-Host " $msg " -ForegroundColor $colour -BackgroundColor Red
+    Write-Host
+    Write-Host $_.Exception.Message -ForegroundColor White
+    Write-Host
+}
+
+function Show-SuccessMessage {
+    param (
+        [Parameter()]
+        $msg = "SUCCESS",
+
+        [Parameter()]
+        $msgColor = 'Black'
+    )
+
+    Write-Host
+    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor Cyan
+    Write-Host
+}
+
+# Updated Install-Applications function with new message functions
 function Install-Applications {
     try {
         $apps = Get-ConfigValue -section "Applications" -key "Apps"
         if ($apps) {
             $appList = $apps -split ','
+            Show-SystemMessage -title "Installing Applications"
             Write-Log "Installing applications: $apps"
             foreach ($app in $appList) {
                 try {
                     $escapedApp = [regex]::Escape($app)
                     $isAppInstalled = winget list | Select-String -Pattern $escapedApp
                     if ($isAppInstalled) {
+                        Show-SystemMessage -msg1 "- $app is already installed. Skipping installation." -msg1Color "Cyan"
                         Write-Log "Application $app is already installed. Skipping installation."
                     } else {
+                        Show-SystemMessage -msg1 "- Installing: " -msg2 $app
                         winget install $app -e --id $app -h
                         Write-Log "Application installed: $app"
+                        Show-SystemMessage -msg1 "- $app installed successfully." -msg1Color "Green"
                     }
                 } catch {
                     Write-Log "Error installing application ${app}: $($_.Exception.Message)"
+                    Show-ErrorMessage -msg "- Error installing ${app}: $($_.Exception.Message)" -colour "Red"
                 }
             }
             Write-Log "Applications installation completed."
+            Show-SuccessMessage
         } else {
-            Write-Log "No applications to install. Missing configuration."
+            Write-Log "No applications to install or missing configuration."
+            Show-SystemMessage -msg1 "No applications to install or missing configuration." -colour "Cyan"
         }
     } catch {
         Write-Log "Error processing applications: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error processing applications: $($_.Exception.Message)" -colour "Red"
         exit 1
     }
 }
+
 
 
 
