@@ -498,27 +498,25 @@ function Remove-RegistryEntries {
 # Function to configure DNS settings
 function Set-DNSSettings {
     try {
+        $interfaceAlias = Get-ConfigValue -section "Network" -key "Interface"
         $dns1 = Get-ConfigValue -section "Network" -key "DNS1"
         $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
-        $interfaceAlias = "Ethernet"  # or use a specific alias if needed
 
-        if ($dns1) {
-            Write-Log "Setting primary DNS to: $dns1"
-            Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses $dns1
+        if ($interfaceAlias -and $dns1 -and $dns2) {
+            Write-Log "Configuring DNS settings for interface: $interfaceAlias"
+            $dnsServers = @($dns1, $dns2)
+            Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses $dnsServers
+            Write-Log "DNS settings configured successfully: $dnsServers"
+        } else {
+            Write-Log "Error: Both DNS1 and DNS2 must be provided in the configuration file."
+            exit 1
         }
-
-        if ($dns2) {
-            Write-Log "Setting secondary DNS to: $dns2"
-            $currentDNS = (Get-DnsClientServerAddress -InterfaceAlias $interfaceAlias).ServerAddresses
-            Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses ($currentDNS + $dns2)
-        }
-
-        Write-Log "DNS settings configured successfully."
     } catch {
         Write-Log "Error configuring DNS settings: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 
@@ -593,6 +591,8 @@ function Set-WindowsUpdates {
     }
 }
 
+
+# Function to set optional windows features and services
 function Set-Services {
     try {
         $services = $config["Services"]
@@ -603,16 +603,15 @@ function Set-Services {
                 try {
                     if ($serviceAction -eq "enabled") {
                         Write-Log "Enabling service: $serviceName"
-                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                        Enable-WindowsOptionalFeature -Online -FeatureName $serviceName -NoRestart
                     } elseif ($serviceAction -eq "disabled") {
                         Write-Log "Disabling service: $serviceName"
-                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                        Disable-WindowsOptionalFeature -Online -FeatureName $serviceName -NoRestart
                     } else {
                         Write-Log "Invalid service action for $($serviceName): $serviceAction"
                     }
                 } catch {
-                    Write-Log "$serviceName could not be configured, check spelling and fix the configuration file."
-                    Write-Log "Error: $($_.Exception.Message)"
+                    Write-Log "$serviceName was not found as an optional service, check spelling and fix the configuration file. Error: $($_.Exception.Message)"
                 }
             }
             Write-Log "Service configurations applied successfully."
@@ -624,6 +623,7 @@ function Set-Services {
         exit 1
     }
 }
+
 
 # Function to configure security settings
 function Set-SecuritySettings {
@@ -739,137 +739,156 @@ function Test-ProgramInstalled {
 
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
-    $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
-        'googlechromestandaloneenterprise64.msi'
-    }
-    else {
-        'googlechromestandaloneenterprise.msi'
-    }
+    $installChrome = Get-ConfigValue -section "Google" -key "InstallGoogleChrome"
 
-    $chromeUrl = "https://dl.google.com/chrome/install/$chromeFileName"
-    
-    if (Test-ProgramInstalled 'Google Chrome') {
-        Write-Log "Chrome Enterprise already installed. Skipping..."
-    } 
-    else {
-        Write-Log "Downloading Chrome from $chromeUrl"
-        Invoke-WebRequest -Uri $chromeUrl -OutFile "$env:TEMP\$chromeFileName"
+    if ($installChrome -eq "True") {
+        $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
+            'googlechromestandaloneenterprise64.msi'
+        }
+        else {
+            'googlechromestandaloneenterprise.msi'
+        }
 
-        try {
-            $arguments = "/i `"$env:TEMP\$chromeFileName`" /qn"
-            $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
+        $chromeUrl = "https://dl.google.com/chrome/install/$chromeFileName"
+        
+        if (Test-ProgramInstalled 'Google Chrome') {
+            Write-Log "Chrome Enterprise already installed. Skipping..."
+        } 
+        else {
+            Write-Log "Downloading Chrome from $chromeUrl"
+            Invoke-WebRequest -Uri $chromeUrl -OutFile "$env:TEMP\$chromeFileName"
 
-            if ($installProcess.ExitCode -eq 0) {
-                Write-Log "Chrome Enterprise installed and enrolled."
+            try {
+                $arguments = "/i `"$env:TEMP\$chromeFileName`" /qn"
+                $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
+
+                if ($installProcess.ExitCode -eq 0) {
+                    Write-Log "Chrome Enterprise installed and enrolled."
+                }
+                else {
+                    Write-Log "Failed to install Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
+                }
             }
-            else {
-                Write-Log "Failed to install Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
+            finally {
+                Remove-Item -Path "$env:TEMP\$chromeFileName" -Force -ErrorAction SilentlyContinue
             }
         }
-        finally {
-            Remove-Item -Path "$env:TEMP\$chromeFileName" -Force -ErrorAction SilentlyContinue
-        }
+    } else {
+        Write-Log "Skipping Chrome Enterprise installation as per configuration."
     }
 }
 
 # Function to install GCPW
 function Install-GCPW {
-    $requiredKeys = @("DomainsAllowedToLogin", "EnrollmentToken")
-    if (-not (Validate-RequiredKeys -section "GoogleGCPW" -requiredKeys $requiredKeys)) {
-        Write-Log "Skipping GCPW installation due to missing keys."
-        return
-    }
+    $installGCPW = Get-ConfigValue -section "Google" -key "InstallGCPW"
 
-    $domainsAllowedToLogin = Get-ConfigValue -section "GoogleGCPW" -key "DomainsAllowedToLogin"
-    $googleEnrollmentToken = Get-ConfigValue -section "GoogleGCPW" -key "EnrollmentToken"
+    if ($installGCPW -eq "True") {
+        $requiredKeys = @("DomainsAllowedToLogin", "GCPW-EnrollmentToken")
+        if (-not (Validate-RequiredKeys -section "Google" -requiredKeys $requiredKeys)) {
+            Write-Log "Skipping GCPW installation due to missing keys."
+            return
+        }
 
-    $gcpwFileName = if ([Environment]::Is64BitOperatingSystem) {
-        'gcpwstandaloneenterprise64.msi'
-    }
-    else {
-        'gcpwstandaloneenterprise.msi'
-    }
+        $domainsAllowedToLogin = Get-ConfigValue -section "Google" -key "DomainsAllowedToLogin"
+        $googleEnrollmentToken = Get-ConfigValue -section "Google" -key "GCPW-EnrollmentToken"
 
-    $gcpwUrl = "https://dl.google.com/credentialprovider/$gcpwFileName"
-    if (Test-ProgramInstalled 'Credential Provider') {
-        Write-Log "GCPW already installed. Skipping..."
-    }
-    else {
-        Write-Log "Downloading GCPW from $gcpwUrl"
-        Invoke-WebRequest -Uri $gcpwUrl -OutFile "$env:TEMP\$gcpwFileName"
+        $gcpwFileName = if ([Environment]::Is64BitOperatingSystem) {
+            'gcpwstandaloneenterprise64.msi'
+        }
+        else {
+            'gcpwstandaloneenterprise.msi'
+        }
 
-        try {
-            $arguments = "/i `"$env:TEMP\$gcpwFileName`" /quiet"
-            $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
+        $gcpwUrl = "https://dl.google.com/credentialprovider/$gcpwFileName"
+        if (Test-ProgramInstalled 'Credential Provider') {
+            Write-Log "GCPW already installed. Skipping..."
+        }
+        else {
+            Write-Log "Downloading GCPW from $gcpwUrl"
+            Invoke-WebRequest -Uri $gcpwUrl -OutFile "$env:TEMP\$gcpwFileName"
 
-            if ($installProcess.ExitCode -eq 0) {
-                Write-Log "GCPW Installation completed successfully!"
-                
-                try {
-                    $gcpwRegistryPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
-                    New-Item -Path $gcpwRegistryPath -Force -ErrorAction Stop
-                    Set-ItemProperty -Path $gcpwRegistryPath -Name "EnrollmentToken" -Value $googleEnrollmentToken -ErrorAction Stop
+            try {
+                $arguments = "/i `"$env:TEMP\$gcpwFileName`" /quiet"
+                $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
+
+                if ($installProcess.ExitCode -eq 0) {
+                    Write-Log "GCPW Installation completed successfully!"
+                    
+                    try {
+                        $gcpwRegistryPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
+                        New-Item -Path $gcpwRegistryPath -Force -ErrorAction Stop
+                        Set-ItemProperty -Path $gcpwRegistryPath -Name "EnrollmentToken" -Value $googleEnrollmentToken -ErrorAction Stop
+                    }
+                    catch {
+                        Write-Log "Error: $($_.Exception.Message)"
+                    }
+
+                    Set-ItemProperty -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login" -Value $domainsAllowedToLogin
+                    $domains = Get-ItemPropertyValue -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login"
+                    if ($domains -eq $domainsAllowedToLogin) {
+                        Write-Log 'Domains have been set'
+                    }
                 }
-                catch {
-                    Write-Log "Error: $($_.Exception.Message)"
-                }
-
-                Set-ItemProperty -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login" -Value $domainsAllowedToLogin
-                $domains = Get-ItemPropertyValue -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login"
-                if ($domains -eq $domainsAllowedToLogin) {
-                    Write-Log 'Domains have been set'
+                else {
+                    Write-Log "Failed to install GCPW. Exit code: $($installProcess.ExitCode)"
                 }
             }
-            else {
-                Write-Log "Failed to install GCPW. Exit code: $($installProcess.ExitCode)"
+            finally {
+                Remove-Item -Path "$env:TEMP\$gcpwFileName" -Force -ErrorAction SilentlyContinue
             }
         }
-        finally {
-            Remove-Item -Path "$env:TEMP\$gcpwFileName" -Force -ErrorAction SilentlyContinue
-        }
+    } else {
+        Write-Log "Skipping GCPW installation as per configuration."
     }
 }
 
 # Function to install Google Drive
 function Install-GoogleDrive {
-    $driveFileName = 'GoogleDriveFSSetup.exe'
-    $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
-    if (Test-ProgramInstalled 'Google Drive') {
-        Write-Log 'Google Drive already installed. Skipping...'
-    }
-    else {
-        Write-Log "Downloading Google Drive from $driveUrl"
-        Invoke-WebRequest -Uri $driveUrl -OutFile "$env:TEMP\$driveFileName"
+    $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
 
-        try {
-            Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent'
-            Write-Log 'Google Drive Installation completed successfully!'
+    if ($installGoogleDrive -eq "True") {
+        $driveFileName = 'GoogleDriveFSSetup.exe'
+        $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
+        if (Test-ProgramInstalled 'Google Drive') {
+            Write-Log 'Google Drive already installed. Skipping...'
+        }
+        else {
+            Write-Log "Downloading Google Drive from $driveUrl"
+            Invoke-WebRequest -Uri $driveUrl -OutFile "$env:TEMP\$driveFileName"
+
             try {
-                Write-Log "Setting Google Drive Configurations"
-                $driveRegistryPath = 'HKLM:\SOFTWARE\Google\DriveFS'
-                New-Item -Path $driveRegistryPath -Force -ErrorAction Stop
-                Set-ItemProperty -Path $driveRegistryPath -Name 'AutoStartOnLogin' -Value 1 -Type DWord -Force -ErrorAction Stop
-                Set-ItemProperty -Path $driveRegistryPath -Name 'DefaultWebBrowser' -Value "$env:systemdrive\Program Files\Google\Chrome\Application\chrome.exe" -Type String -Force -ErrorAction Stop
-                Set-ItemProperty -Path $driveRegistryPath -Name 'OpenOfficeFilesInDocs' -Value 0 -Type DWord -Force -ErrorAction Stop
+                Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent'
+                Write-Log 'Google Drive Installation completed successfully!'
+                try {
+                    Write-Log "Setting Google Drive Configurations"
+                    $driveRegistryPath = 'HKLM:\SOFTWARE\Google\DriveFS'
+                    New-Item -Path $driveRegistryPath -Force -ErrorAction Stop
+                    Set-ItemProperty -Path $driveRegistryPath -Name 'AutoStartOnLogin' -Value 1 -Type DWord -Force -ErrorAction Stop
+                    Set-ItemProperty -Path $driveRegistryPath -Name 'DefaultWebBrowser' -Value "$env:systemdrive\Program Files\Google\Chrome\Application\chrome.exe" -Type String -Force -ErrorAction Stop
+                    Set-ItemProperty -Path $driveRegistryPath -Name 'OpenOfficeFilesInDocs' -Value 0 -Type DWord -Force -ErrorAction Stop
 
-                Write-Log 'Google Drive policies have been set'
+                    Write-Log 'Google Drive policies have been set'
 
+                }
+                catch {
+                    Write-Log "Google Drive policies have failed to be added to the registry"
+                    Write-Log "Error: $($_.Exception.Message)"
+                }
+                
             }
             catch {
-                Write-Log "Google Drive policies have failed to be added to the registry"
+                Write-Log "Installation failed!"
                 Write-Log "Error: $($_.Exception.Message)"
             }
-            
+            finally {
+                Remove-Item -Path "$env:TEMP\$driveFileName" -Force -ErrorAction SilentlyContinue
+            }
         }
-        catch {
-            Write-Log "Installation failed!"
-            Write-Log "Error: $($_.Exception.Message)"
-        }
-        finally {
-            Remove-Item -Path "$env:TEMP\$driveFileName" -Force -ErrorAction SilentlyContinue
-        }
+    } else {
+        Write-Log "Skipping Google Drive installation as per configuration."
     }
 }
+
 
 # Function to import tasks into Task Scheduler
 function Import-Tasks {
