@@ -323,37 +323,38 @@ function Show-SuccessMessage {
     Write-Host
 }
 
-# Updated Install-Applications function with new message functions
+# Function to install applications via winget using manifest files
 function Install-Applications {
     try {
-        $apps = Get-ConfigValue -section "Applications" -key "Apps"
-        if ($apps) {
-            $appList = $apps -split ','
+        $appManifestFile = Get-ConfigValue -section "Applications" -key "WingetAppManifest"
+        if ($appManifestFile) {
             Show-SystemMessage -title "Installing Applications"
-            Write-Log "Installing applications: $apps"
-            foreach ($app in $appList) {
-                try {
-                    $escapedApp = [regex]::Escape($app)
-                    $isAppInstalled = winget list | Select-String -Pattern $escapedApp
-                    if ($isAppInstalled) {
-                        Show-SystemMessage -msg1 "- $app is already installed. Skipping installation." -msg1Color "Cyan"
-                        Write-Log "Application $app is already installed. Skipping installation."
-                    } else {
-                        Show-SystemMessage -msg1 "- Installing: " -msg2 $app
-                        winget install $app -e --id $app -h --accept-package-agreements --accept-source-agreements
-                        Write-Log "Application installed: $app"
-                        Show-SystemMessage -msg1 "- $app installed successfully." -msg1Color "Green"
-                    }
-                } catch {
-                    Write-Log "Error installing application ${app}: $($_.Exception.Message)"
-                    Show-ErrorMessage -msg "- Error installing ${app}: $($_.Exception.Message)" -colour "Red"
-                }
+            Write-Log "Installing applications using manifest file: $appManifestFile"
+
+            # Download the manifest file if it's a URL
+            if ($appManifestFile -match "^https?://") {
+                $tempAppManifestFile = "$env:TEMP\appManifest.json"
+                Write-Log "Downloading app manifest file from: $appManifestFile"
+                Show-SystemMessage -msg1 "- Downloading app manifest file"
+                Invoke-WebRequest -Uri $appManifestFile -OutFile $tempAppManifestFile
+                $appManifestFile = $tempAppManifestFile
             }
+
+            try {
+                Show-SystemMessage -msg1 "- Importing applications from manifest file"
+                winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements --disable-interactivity
+                Write-Log "Applications installed using manifest file: $appManifestFile"
+                Show-SystemMessage -msg1 "- Applications installed successfully." -msg1Color "Green"
+            } catch {
+                Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
+                Show-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
+            }
+
             Write-Log "Applications installation completed."
             Show-SuccessMessage
         } else {
-            Write-Log "No applications to install or missing configuration."
-            Show-SystemMessage -msg1 "No applications to install or missing configuration." -colour "Cyan"
+            Write-Log "No app manifest file provided or missing configuration."
+            Show-SystemMessage -msg1 "No app manifest file provided or missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error processing applications: $($_.Exception.Message)"
@@ -361,7 +362,6 @@ function Install-Applications {
         exit 1
     }
 }
-
 
 
 
