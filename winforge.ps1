@@ -342,7 +342,7 @@ function Install-Applications {
 
             try {
                 Show-SystemMessage -msg1 "- Importing applications from manifest file"
-                winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements --disable-interactivity
+                winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
                 Write-Log "Applications installed using manifest file: $appManifestFile"
                 Show-SystemMessage -msg1 "- Applications installed successfully." -msg1Color "Green"
             } catch {
