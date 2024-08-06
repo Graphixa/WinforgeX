@@ -30,15 +30,28 @@ param (
 $logFile = Join-Path -Path $env:SYSTEMDRIVE -ChildPath "winforge-configuration.log"
 $config = @{}
 
-# Function to log messages
-function Write-Log {
-    param (
-        [string]$message
-    )
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "$timestamp - $message"
-    Write-Output $logMessage | Out-File -Append -FilePath $logFile
+
+
+# Function to check if the current user is an admin
+function Test-IsAdmin {
+    $admin = [bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match 'S-1-5-32-544')
+    return $admin
 }
+
+# Download and read the configuration file if it's a URL
+function Get-ConfigFile {
+    param (
+        [string]$configFile
+    )
+    if ($configFile -match "^https?://") {
+        $tempConfigFile = "$env:TEMP\config.ini"
+        Write-Log "Downloading configuration file from: $configFile"
+        Invoke-WebRequest -Uri $configFile -OutFile $tempConfigFile
+        $configFile = $tempConfigFile
+    }
+    return $configFile
+}
+
 
 # Function to read INI file
 function Read-IniFile {
@@ -89,6 +102,15 @@ function Validate-RequiredKeys {
     return $true
 }
 
+# Function to log messages
+function Write-Log {
+    param (
+        [string]$message
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "$timestamp - $message"
+    Write-Output $logMessage | Out-File -Append -FilePath $logFile
+}
 
 function Show-SystemMessage {
     param (
@@ -318,7 +340,7 @@ function Install-Applications {
                         Write-Log "Application $app is already installed. Skipping installation."
                     } else {
                         Show-SystemMessage -msg1 "- Installing: " -msg2 $app
-                        winget install $app -e --id $app -h
+                        winget install $app -e --id $app -h --accept-package-agreements --accept-source-agreements
                         Write-Log "Application installed: $app"
                         Show-SystemMessage -msg1 "- $app installed successfully." -msg1Color "Green"
                     }
@@ -401,6 +423,7 @@ function Install-Fonts {
             $fontsList = $fonts -split ',' | ForEach-Object { $_.Trim('"').ToLower() }
             $ProgressPreference = 'SilentlyContinue'
             $tempDownloadFolder = "$env:TEMP\google_fonts"
+            Show-SystemMessage -title "Installing Fonts"
 
             foreach ($fontName in $fontsList) {
                 # Correct the font names for the GitHub repository
@@ -411,10 +434,12 @@ function Install-Fonts {
 
                 if ($isFontInstalled) {
                     Write-Log "Font $correctFontName is already installed. Skipping download and installation."
+                    Show-SystemMessage -msg1 "- $correctFontName is already installed. Skipping installation." -msg1Color "Cyan"
                     continue
                 }
 
                 Write-Log "Downloading & Installing $correctFontName from Google Fonts GitHub repository. Please wait..."
+                Show-SystemMessage -msg1 "- Downloading & Installing: " -msg2 $correctFontName
 
                 # Download the font files
                 Get-Fonts -fontName $correctFontName -outputPath $tempDownloadFolder
@@ -428,17 +453,21 @@ function Install-Fonts {
                 }
 
                 Write-Log "Font installed: $correctFontName"
+                Show-SystemMessage -msg1 "- $correctFontName installed successfully." -msg1Color "Green"
 
                 # Clean up the downloaded font files
                 Remove-Item -Path $tempDownloadFolder -Recurse -Force
             }
 
             Write-Log "All fonts installed successfully."
+            Show-SuccessMessage
         } else {
             Write-Log "No fonts to install. Missing configuration."
+            Show-SystemMessage -msg1 "No fonts to install. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error installing fonts: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error installing fonts: $($_.Exception.Message)" -colour "Red"
         exit 1
     }
 }
@@ -449,31 +478,37 @@ function Install-Fonts {
 # Function to install Microsoft Office
 function Install-Office {
     try {
-        $requiredKeys = @("LicenseKey", "ProductID", "LanguageID", "UpdatesEnabled", "DisplayLevel", "SetupReboot", "Channel", "OfficeClientEdition")
-        if (-not (Validate-RequiredKeys -section "Office" -requiredKeys $requiredKeys)) {
-            Write-Log "Skipping Office installation due to missing keys."
-            return
-        }
+        $officeSectionExists = $config.ContainsKey("Office")
+        if ($officeSectionExists) {
+            Show-SystemMessage -title "Installing Microsoft Office"
+            $requiredKeys = @("LicenseKey", "ProductID", "LanguageID", "UpdatesEnabled", "DisplayLevel", "SetupReboot", "Channel", "OfficeClientEdition")
+            if (-not (Validate-RequiredKeys -section "Office" -requiredKeys $requiredKeys)) {
+                Write-Log "Skipping Office installation due to missing keys."
+                Show-SystemMessage -msg1 "Skipping Office installation due to missing keys." -msg1Color "Yellow"
+                return
+            }
 
-        $licenseKey = Get-ConfigValue -section "Office" -key "LicenseKey"
-        $productID = Get-ConfigValue -section "Office" -key "ProductID"
-        $languageID = Get-ConfigValue -section "Office" -key "LanguageID"
-        $updatesEnabled = Get-ConfigValue -section "Office" -key "UpdatesEnabled"
-        $displayLevel = Get-ConfigValue -section "Office" -key "DisplayLevel"
-        $setupReboot = Get-ConfigValue -section "Office" -key "SetupReboot"
-        $channel = Get-ConfigValue -section "Office" -key "Channel"
-        $officeClientEdition = Get-ConfigValue -section "Office" -key "OfficeClientEdition"
+            $licenseKey = Get-ConfigValue -section "Office" -key "LicenseKey"
+            $productID = Get-ConfigValue -section "Office" -key "ProductID"
+            $languageID = Get-ConfigValue -section "Office" -key "LanguageID"
+            $updatesEnabled = Get-ConfigValue -section "Office" -key "UpdatesEnabled"
+            $displayLevel = Get-ConfigValue -section "Office" -key "DisplayLevel"
+            $setupReboot = Get-ConfigValue -section "Office" -key "SetupReboot"
+            $channel = Get-ConfigValue -section "Office" -key "Channel"
+            $officeClientEdition = Get-ConfigValue -section "Office" -key "OfficeClientEdition"
 
-        $odtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16731-20398.exe"
-        $odtPath = $env:TEMP
-        $odtFile = "$odtPath/ODTSetup.exe"
-        $configurationXMLFile = "$odtPath\configuration.xml"
+            $odtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16731-20398.exe"
+            $odtPath = $env:TEMP
+            $odtFile = "$odtPath/ODTSetup.exe"
+            $configurationXMLFile = "$odtPath\configuration.xml"
 
-        Write-Log "Downloading Office Deployment Tool..."
-        Invoke-WebRequest -Uri $odtUrl -OutFile $odtFile
+            Write-Log "Downloading Office Deployment Tool..."
+            Show-SystemMessage -msg1 "Downloading Office Deployment Tool..."
+            Invoke-WebRequest -Uri $odtUrl -OutFile $odtFile
 
-        Write-Log "Creating configuration XML file..."
-        @"
+            Write-Log "Creating configuration XML file..."
+            Show-SystemMessage -msg1 "Creating configuration XML file..."
+            @"
 <Configuration>
   <Add OfficeClientEdition="$officeClientEdition" Channel="$channel">
     <Product ID="$productID">
@@ -488,32 +523,50 @@ function Install-Office {
 </Configuration>
 "@ | Out-File $configurationXMLFile
 
-        Write-Log "Running the Office Deployment Tool..."
-        Start-Process $odtFile -ArgumentList "/quiet /extract:$odtPath" -Wait
+            Write-Log "Running the Office Deployment Tool..."
+            Show-SystemMessage -msg1 "Running the Office Deployment Tool..."
+            Start-Process $odtFile -ArgumentList "/quiet /extract:$odtPath" -Wait
 
-        Write-Log "Downloading and installing Microsoft Office..."
-        Start-Process "$odtPath\Setup.exe" -ArgumentList "/configure `"$configurationXMLFile`"" -Wait -PassThru
+            Write-Log "Downloading and installing Microsoft Office..."
+            Show-SystemMessage -msg1 "Downloading and installing Microsoft Office..."
+            $installProcess = Start-Process "$odtPath\Setup.exe" -ArgumentList "/configure `"$configurationXMLFile`"" -Wait -PassThru
 
-        Write-Log "Microsoft Office installation completed successfully."
+            if ($installProcess.ExitCode -eq 0) {
+                Write-Log "Microsoft Office installation completed successfully."
+                Show-SuccessMessage -msg "Microsoft Office installation completed successfully."
+            } else {
+                Write-Log "Failed to install Microsoft Office. Exit code: $($installProcess.ExitCode)"
+                Show-ErrorMessage -msg "Failed to install Microsoft Office. Exit code: $($installProcess.ExitCode)"
+            }
 
-        # Clean up the extracted files and the zip file
-        Remove-Item $odtFile
-        Remove-Item $configurationXMLFile
+            # Clean up the extracted files and the zip file
+            Remove-Item $odtFile
+            Remove-Item $configurationXMLFile
+        } else {
+            Write-Log "Office section not found in configuration file. Skipping Office installation."
+            Show-SystemMessage -msg1 "Office section not found in configuration file. Skipping Office installation." -msg1Color "Yellow"
+        }
     } catch {
         Write-Log "Error installing Microsoft Office: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error installing Microsoft Office: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 # Function to set wallpaper
 function Set-Wallpaper {
     try {
         $wallpaperPath = Get-ConfigValue -section "Theme" -key "WallpaperPath"
         if ($wallpaperPath) {
+            Show-SystemMessage -title "Setting Wallpaper"
+            Write-Log "Setting wallpaper..."
+
             # Check if the path is a URL
             if ($wallpaperPath -match "^https?://") {
                 $tempWallpaperPath = "$env:TEMP\wallpaper.jpg"
                 Write-Log "Downloading wallpaper from: $wallpaperPath"
+                Show-SystemMessage -msg1 "Downloading wallpaper from: " -msg2 $wallpaperPath
                 Invoke-WebRequest -Uri $wallpaperPath -OutFile $tempWallpaperPath
                 $wallpaperPath = $tempWallpaperPath
             }
@@ -540,14 +593,18 @@ function Set-Wallpaper {
             Start-Process explorer
 
             Write-Log "Wallpaper set successfully."
+            Show-SuccessMessage -msg "Wallpaper set successfully."
         } else {
             Write-Log "Wallpaper not set. Missing configuration."
+            Show-SystemMessage -msg1 "Wallpaper not set. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error setting wallpaper: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error setting wallpaper: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 # Function to set lock screen image
@@ -555,10 +612,14 @@ function Set-LockScreenImage {
     try {
         $lockScreenPath = Get-ConfigValue -section "Theme" -key "LockScreenPath"
         if ($lockScreenPath) {
+            Show-SystemMessage -title "Setting Lock Screen Image"
+            Write-Log "Setting lock screen image..."
+
             # Check if the path is a URL
             if ($lockScreenPath -match "^https?://") {
                 $tempLockScreenPath = "$env:TEMP\lockscreen.jpg"
                 Write-Log "Downloading lock screen image from: $lockScreenPath"
+                Show-SystemMessage -msg1 "Downloading lock screen image from: " -msg2 $lockScreenPath
                 Invoke-WebRequest -Uri $lockScreenPath -OutFile $tempLockScreenPath
                 $lockScreenPath = $tempLockScreenPath
             }
@@ -585,14 +646,18 @@ function Set-LockScreenImage {
             Start-Process explorer
 
             Write-Log "Lock screen image set successfully."
+            Show-SuccessMessage -msg "Lock screen image set successfully."
         } else {
             Write-Log "Lock screen image not set. Missing configuration."
+            Show-SystemMessage -msg1 "Lock screen image not set. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error setting lock screen image: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error setting lock screen image: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 # Function to add registry entries
@@ -600,6 +665,7 @@ function Add-RegistryEntries {
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
+            Show-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 4) {
@@ -609,17 +675,22 @@ function Add-RegistryEntries {
                     $data = $entry[3].Trim()
 
                     Write-Log "Adding registry entry: KeyName=${keyName}, Value=${value}, Type=${type}, Data=${data}"
+                    Show-SystemMessage -msg1 "- Adding: " -msg2 "${keyName}, Value=${value}, Type=${type}, Data=${data}"
                     cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
+                    Show-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries added successfully."
+            Show-SuccessMessage -msg "Registry entries added successfully."
         } else {
             Write-Log "No registry entries to add. Missing configuration."
+            Show-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
         exit 1
     }
 }
@@ -629,6 +700,7 @@ function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
+            Show-SystemMessage -title "Removing Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 2) {
@@ -636,20 +708,26 @@ function Remove-RegistryEntries {
                     $value = $entry[1].Trim()
 
                     Write-Log "Removing registry entry: KeyName=${keyName}, Value=${value}"
+                    Show-SystemMessage -msg1 "- Removing: " -msg2 "${keyName}, Value=${value}"
                     cmd.exe /c "reg delete ${keyName} /v ${value} /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
+                    Show-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries removed successfully."
+            Show-SuccessMessage -msg "Registry entries removed successfully."
         } else {
             Write-Log "No registry entries to remove. Missing configuration."
+            Show-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 
@@ -661,19 +739,28 @@ function Set-DNSSettings {
         $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
 
         if ($interfaceAlias -and $dns1 -and $dns2) {
+            Show-SystemMessage -title "Configuring DNS Settings"
             Write-Log "Configuring DNS settings for interface: $interfaceAlias"
+            Show-SystemMessage -msg1 "- Setting primary DNS: " -msg2 $dns1
+            Show-SystemMessage -msg1 "- Setting secondary DNS: " -msg2 $dns2
+
             $dnsServers = @($dns1, $dns2)
             Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses $dnsServers
+
             Write-Log "DNS settings configured successfully: $dnsServers"
+            Show-SuccessMessage -msg "DNS settings configured successfully."
         } else {
             Write-Log "Error: Both DNS1 and DNS2 must be provided in the configuration file."
+            Show-ErrorMessage -msg "Error: Both DNS1 and DNS2 must be provided in the configuration file."
             exit 1
         }
     } catch {
         Write-Log "Error configuring DNS settings: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error configuring DNS settings: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 
@@ -713,41 +800,54 @@ function Set-WindowsUpdates {
         $scheduledInstallDay = Get-ConfigValue -section "WindowsUpdate" -key "ScheduledInstallDay"
         $scheduledInstallTime = Get-ConfigValue -section "WindowsUpdate" -key "ScheduledInstallTime"
 
+        Show-SystemMessage -title "Configuring Windows Updates"
+        
         if ($noAutoUpdate -eq "TRUE") {
             Write-Log "Disabling all automatic updates..."
+            Show-SystemMessage -msg1 "- Disabling all automatic updates."
             Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Value 1 -Type DWord -Force
             Write-Log "Automatic updates disabled."
+            Show-SystemMessage -msg1 "- Automatic updates disabled." -msg1Color "Green"
         } else {
             Write-Log "Configuring Windows updates..."
 
             if ($auOptions -and $scheduledInstallDay -and $scheduledInstallTime) {
                 Write-Log "Setting AUOptions to: $auOptions"
+                Show-SystemMessage -msg1 "- Setting AUOptions to: " -msg2 $auOptions
                 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Value $auOptions -Type DWord -Force
 
                 Write-Log "Setting ScheduledInstallDay to: $scheduledInstallDay"
+                Show-SystemMessage -msg1 "- Setting ScheduledInstallDay to: " -msg2 $scheduledInstallDay
                 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallDay" -Value $scheduledInstallDay -Type DWord -Force
 
                 Write-Log "Setting ScheduledInstallTime to: $scheduledInstallTime"
+                Show-SystemMessage -msg1 "- Setting ScheduledInstallTime to: " -msg2 $scheduledInstallTime
                 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallTime" -Value $scheduledInstallTime -Type DWord -Force
             } else {
                 Write-Log "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings."
+                Show-SystemMessage -msg1 "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings." -msg1Color "Yellow"
             }
 
             if ($autoInstallMinorUpdates) {
                 $autoInstallValue = if ($autoInstallMinorUpdates -eq "TRUE") { 1 } else { 0 }
                 Write-Log "Setting AutoInstallMinorUpdates to: $autoInstallValue"
+                Show-SystemMessage -msg1 "- Setting AutoInstallMinorUpdates to: " -msg2 $autoInstallValue
                 Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AutoInstallMinorUpdates" -Value $autoInstallValue -Type DWord -Force
             } else {
                 Write-Log "No AutoInstallMinorUpdates setting provided."
+                Show-SystemMessage -msg1 "No AutoInstallMinorUpdates setting provided." -msg1Color "Yellow"
             }
 
             Write-Log "Windows updates configured successfully."
+            Show-SystemMessage -msg1 "- Windows updates configured successfully." -msg1Color "Green"
         }
     } catch {
         Write-Log "Error configuring Windows updates: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error configuring Windows updates: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 # Function to set optional windows features and services
@@ -803,16 +903,22 @@ function Set-SecuritySettings {
         $disableCopilot = Get-ConfigValue -section "SecuritySettings" -key "DisableCopilot"
         $disableOneDrive = Get-ConfigValue -section "SecuritySettings" -key "DisableOneDrive"
 
+        Show-SystemMessage -title "Configuring Security Settings"
+
         # Set UAC level
         if ($uacLevel) {
+            Show-SystemMessage -msg1 "- Setting UAC level to: " -msg2 $uacLevel
             Write-Log "Setting UAC level to: $uacLevel"
             Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value $uacLevel
+            Show-SystemMessage -msg1 "- UAC level set to $uacLevel." -msg1Color "Green"
         } else {
             Write-Log "UAC level not set. Missing configuration."
+            Show-SystemMessage -msg1 "- UAC level not set. Missing configuration." -msg1Color "Cyan"
         }
 
         # Disable Telemetry
         if ($disableTelemetry -eq "TRUE") {
+            Show-SystemMessage -msg1 "- Disabling Windows Telemetry..."
             Write-Log "Disabling Windows Telemetry..."
             $telemetryKeys = @(
                 "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection -Name AllowTelemetry -Value 0 -Type DWord",
@@ -824,24 +930,30 @@ function Set-SecuritySettings {
                 Set-ItemProperty -Path $path -Name $name -Value $value -Type $type
             }
             Write-Log "Windows Telemetry disabled."
+            Show-SystemMessage -msg1 "- Windows Telemetry disabled." -msg1Color "Green"
         }
 
         # Show file extensions
         if ($showFileExtensions -eq "TRUE") {
+            Show-SystemMessage -msg1 "- Configuring to always display file type extensions..."
             Write-Log "Configuring to always display file type extensions..."
             Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value 0
             Write-Log "File type extensions will always be displayed."
+            Show-SystemMessage -msg1 "- File type extensions will always be displayed." -msg1Color "Green"
         }
 
         # Disable Copilot
         if ($disableCopilot -eq "TRUE") {
+            Show-SystemMessage -msg1 "- Disabling Windows Copilot..."
             Write-Log "Disabling Windows Copilot..."
             Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "CopilotEnabled" -Value 0 -Type DWord
             Write-Log "Windows Copilot disabled."
+            Show-SystemMessage -msg1 "- Windows Copilot disabled." -msg1Color "Green"
         }
 
         # Disable OneDrive
         if ($disableOneDrive -eq "TRUE") {
+            Show-SystemMessage -msg1 "- Disabling OneDrive..."
             Write-Log "Disabling OneDrive..."
             $oneDriveKeys = @(
                 "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive -Name DisableFileSyncNGSC -Value 1 -Type DWord",
@@ -853,13 +965,17 @@ function Set-SecuritySettings {
             }
             Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
             Write-Log "OneDrive disabled."
+            Show-SystemMessage -msg1 "- OneDrive disabled." -msg1Color "Green"
         }
 
+        Show-SuccessMessage -msg "Security settings configured successfully."
     } catch {
         Write-Log "Error configuring security settings: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error configuring security settings: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 
 # Function to set environment variables
@@ -867,26 +983,28 @@ function Set-EnvironmentVariables {
     try {
         $environmentVariables = $config["EnvironmentVariables"]
         if ($environmentVariables) {
+            Show-SystemMessage -title "Setting Environment Variables"
             foreach ($key in $environmentVariables.Keys) {
                 $value = $environmentVariables[$key]
+                Show-SystemMessage -msg1 "- Setting: " -msg2 "$key=$value"
                 Write-Log "Setting environment variable: $key=$value"
                 [System.Environment]::SetEnvironmentVariable($key, $value, "Machine")
+                Show-SystemMessage -msg1 "- Environment variable $key set to $value." -msg1Color "Green"
             }
             Write-Log "Environment variables set successfully."
+            Show-SuccessMessage -msg "Environment variables set successfully."
         } else {
             Write-Log "No environment variables to set. Missing configuration."
+            Show-SystemMessage -msg1 "No environment variables to set. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error setting environment variables: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error setting environment variables: $($_.Exception.Message)"
         exit 1
     }
 }
 
-# Function to check if the current user is an admin
-function Test-IsAdmin {
-    $admin = [bool](([System.Security.Principal.WindowsIdentity]::GetCurrent()).groups -match 'S-1-5-32-544')
-    return $admin
-}
+
 
 # Function to test if a program is installed
 function Test-ProgramInstalled {
@@ -911,19 +1029,20 @@ function Install-ChromeEnterprise {
     $installChrome = Get-ConfigValue -section "Google" -key "InstallGoogleChrome"
 
     if ($installChrome -eq "True") {
+        Show-SystemMessage -title "Installing Google Chrome Enterprise"
         $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
             'googlechromestandaloneenterprise64.msi'
-        }
-        else {
+        } else {
             'googlechromestandaloneenterprise.msi'
         }
 
         $chromeUrl = "https://dl.google.com/chrome/install/$chromeFileName"
-        
+
         if (Test-ProgramInstalled 'Google Chrome') {
-            Write-Log "Chrome Enterprise already installed. Skipping..."
-        } 
-        else {
+            Show-SystemMessage -msg1 "- Google Chrome Enterprise is already installed. Skipping installation." -msg1Color "Cyan"
+            Write-Log "Google Chrome Enterprise already installed. Skipping..."
+        } else {
+            Show-SystemMessage -msg1 "- Downloading: " -msg2 "Google Chrome Enterprise"
             Write-Log "Downloading Chrome from $chromeUrl"
             Invoke-WebRequest -Uri $chromeUrl -OutFile "$env:TEMP\$chromeFileName"
 
@@ -932,28 +1051,33 @@ function Install-ChromeEnterprise {
                 $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
 
                 if ($installProcess.ExitCode -eq 0) {
+                    Show-SystemMessage -msg1 "- Google Chrome Enterprise installed successfully." -msg1Color "Green"
                     Write-Log "Chrome Enterprise installed and enrolled."
-                }
-                else {
+                } else {
+                    Show-ErrorMessage -msg "- Failed to install Google Chrome Enterprise. Exit code: $($installProcess.ExitCode)" -colour "Red"
                     Write-Log "Failed to install Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
                 }
-            }
-            finally {
+            } finally {
                 Remove-Item -Path "$env:TEMP\$chromeFileName" -Force -ErrorAction SilentlyContinue
             }
         }
+        Show-SuccessMessage -msg "Google Chrome Enterprise installation completed."
     } else {
-        Write-Log "Skipping Chrome Enterprise installation as per configuration."
+        Write-Log "Skipping Google Chrome Enterprise installation as per configuration."
+        Show-SystemMessage -msg1 "Skipping Google Chrome Enterprise installation as per configuration." -msg1Color "Cyan"
     }
 }
+
 
 # Function to install GCPW
 function Install-GCPW {
     $installGCPW = Get-ConfigValue -section "Google" -key "InstallGCPW"
 
     if ($installGCPW -eq "True") {
+        Show-SystemMessage -title "Installing Google Credential Provider for Windows (GCPW)"
         $requiredKeys = @("DomainsAllowedToLogin", "GCPW-EnrollmentToken")
         if (-not (Validate-RequiredKeys -section "Google" -requiredKeys $requiredKeys)) {
+            Show-SystemMessage -msg1 "Skipping GCPW installation due to missing keys." -msg1Color "Cyan"
             Write-Log "Skipping GCPW installation due to missing keys."
             return
         }
@@ -963,16 +1087,16 @@ function Install-GCPW {
 
         $gcpwFileName = if ([Environment]::Is64BitOperatingSystem) {
             'gcpwstandaloneenterprise64.msi'
-        }
-        else {
+        } else {
             'gcpwstandaloneenterprise.msi'
         }
 
         $gcpwUrl = "https://dl.google.com/credentialprovider/$gcpwFileName"
         if (Test-ProgramInstalled 'Credential Provider') {
+            Show-SystemMessage -msg1 "- Google Credential Provider for Windows (GCPW) is already installed. Skipping installation." -msg1Color "Cyan"
             Write-Log "GCPW already installed. Skipping..."
-        }
-        else {
+        } else {
+            Show-SystemMessage -msg1 "- Downloading: " -msg2 "Google Credential Provider for Windows (GCPW)"
             Write-Log "Downloading GCPW from $gcpwUrl"
             Invoke-WebRequest -Uri $gcpwUrl -OutFile "$env:TEMP\$gcpwFileName"
 
@@ -981,54 +1105,63 @@ function Install-GCPW {
                 $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
 
                 if ($installProcess.ExitCode -eq 0) {
+                    Show-SystemMessage -msg1 "- Google Credential Provider for Windows (GCPW) installed successfully." -msg1Color "Green"
                     Write-Log "GCPW Installation completed successfully!"
                     
                     try {
                         $gcpwRegistryPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
                         New-Item -Path $gcpwRegistryPath -Force -ErrorAction Stop
                         Set-ItemProperty -Path $gcpwRegistryPath -Name "EnrollmentToken" -Value $googleEnrollmentToken -ErrorAction Stop
-                    }
-                    catch {
+                    } catch {
+                        Show-ErrorMessage -msg "Error setting GCPW registry keys: $($_.Exception.Message)"
                         Write-Log "Error: $($_.Exception.Message)"
                     }
 
                     Set-ItemProperty -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login" -Value $domainsAllowedToLogin
                     $domains = Get-ItemPropertyValue -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login"
                     if ($domains -eq $domainsAllowedToLogin) {
+                        Show-SystemMessage -msg1 "- Domains have been set successfully." -msg1Color "Green"
                         Write-Log 'Domains have been set'
                     }
-                }
-                else {
+                } else {
+                    Show-ErrorMessage -msg "- Failed to install Google Credential Provider for Windows (GCPW). Exit code: $($installProcess.ExitCode)" -colour "Red"
                     Write-Log "Failed to install GCPW. Exit code: $($installProcess.ExitCode)"
                 }
-            }
-            finally {
+            } finally {
                 Remove-Item -Path "$env:TEMP\$gcpwFileName" -Force -ErrorAction SilentlyContinue
             }
         }
+        Show-SuccessMessage -msg "Google Credential Provider for Windows (GCPW) installation completed."
     } else {
-        Write-Log "Skipping GCPW installation as per configuration."
+        Write-Log "Skipping Google Credential Provider for Windows (GCPW) installation as per configuration."
+        Show-SystemMessage -msg1 "Skipping Google Credential Provider for Windows (GCPW) installation as per configuration." -msg1Color "Cyan"
     }
 }
+
 
 # Function to install Google Drive
 function Install-GoogleDrive {
     $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
 
     if ($installGoogleDrive -eq "True") {
+        Show-SystemMessage -title "Installing Google Drive"
         $driveFileName = 'GoogleDriveFSSetup.exe'
         $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
         if (Test-ProgramInstalled 'Google Drive') {
+            Show-SystemMessage -msg1 "- Google Drive is already installed. Skipping installation." -msg1Color "Cyan"
             Write-Log 'Google Drive already installed. Skipping...'
-        }
-        else {
+        } else {
+            Show-SystemMessage -msg1 "- Downloading: " -msg2 "Google Drive"
             Write-Log "Downloading Google Drive from $driveUrl"
             Invoke-WebRequest -Uri $driveUrl -OutFile "$env:TEMP\$driveFileName"
 
             try {
-                Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent'
+                Show-SystemMessage -msg1 "- Installing: " -msg2 "Google Drive"
+                Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent' -Wait
                 Write-Log 'Google Drive Installation completed successfully!'
+                Show-SystemMessage -msg1 "- Google Drive installed successfully." -msg1Color "Green"
                 try {
+                    Show-SystemMessage -msg1 "- Setting Google Drive Configurations"
                     Write-Log "Setting Google Drive Configurations"
                     $driveRegistryPath = 'HKLM:\SOFTWARE\Google\DriveFS'
                     New-Item -Path $driveRegistryPath -Force -ErrorAction Stop
@@ -1037,26 +1170,27 @@ function Install-GoogleDrive {
                     Set-ItemProperty -Path $driveRegistryPath -Name 'OpenOfficeFilesInDocs' -Value 0 -Type DWord -Force -ErrorAction Stop
 
                     Write-Log 'Google Drive policies have been set'
-
-                }
-                catch {
-                    Write-Log "Google Drive policies have failed to be added to the registry"
+                    Show-SystemMessage -msg1 "- Google Drive policies set successfully." -msg1Color "Green"
+                } catch {
+                    Show-ErrorMessage -msg "Google Drive policies failed to be added to the registry: $($_.Exception.Message)"
+                    Write-Log "Google Drive policies failed to be added to the registry"
                     Write-Log "Error: $($_.Exception.Message)"
                 }
-                
-            }
-            catch {
+            } catch {
+                Show-ErrorMessage -msg "Google Drive installation failed: $($_.Exception.Message)" -colour "Red"
                 Write-Log "Installation failed!"
                 Write-Log "Error: $($_.Exception.Message)"
-            }
-            finally {
+            } finally {
                 Remove-Item -Path "$env:TEMP\$driveFileName" -Force -ErrorAction SilentlyContinue
             }
         }
+        Show-SuccessMessage -msg "Google Drive installation completed."
     } else {
         Write-Log "Skipping Google Drive installation as per configuration."
+        Show-SystemMessage -msg1 "Skipping Google Drive installation as per configuration." -msg1Color "Cyan"
     }
 }
+
 
 
 # Function to import tasks into Task Scheduler
@@ -1064,30 +1198,38 @@ function Import-Tasks {
     try {
         $tasksSection = $config["Tasks"]
         if ($tasksSection) {
+            Show-SystemMessage -title "Importing Scheduled Tasks"
             foreach ($key in $tasksSection.Keys) {
                 $taskFile = $tasksSection[$key]
 
                 # Download the task file if it's a URL
                 if ($taskFile -match "^https?://") {
                     $tempTaskFile = "$env:TEMP\$key.xml"
+                    Show-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
                     Write-Log "Downloading task file from: $taskFile"
                     Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
                     $taskFile = $tempTaskFile
                 }
 
                 # Import the task into Task Scheduler
+                Show-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
                 Write-Log "Importing task: $taskFile"
                 schtasks /create /tn $key /xml $taskFile /f
+                Show-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
             }
             Write-Log "Tasks imported successfully."
+            Show-SuccessMessage -msg "Scheduled tasks imported successfully."
         } else {
             Write-Log "No tasks to import. Missing configuration."
+            Show-SystemMessage -msg1 "No tasks to import. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
+        Show-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)" -colour "Red"
         Write-Log "Error importing tasks: $($_.Exception.Message)"
         exit 1
     }
 }
+
 
 # Function to activate Windows
 function Activate-Windows {
@@ -1096,33 +1238,28 @@ function Activate-Windows {
         $version = Get-ConfigValue -section "Activation" -key "Version"
 
         if ($productKey -and $version) {
+            Show-SystemMessage -title "Activating Windows"
+            Show-SystemMessage -msg1 "- Activating Windows with product key: " -msg2 $productKey
             Write-Log "Activating Windows with product key: $productKey and version: $version"
             slmgr.vbs /ipk $productKey
             slmgr.vbs /skms kms.server.address
             slmgr.vbs /ato
             Write-Log "Windows activated successfully."
+            Show-SystemMessage -msg1 "- Windows activated successfully." -msg1Color "Green"
+            Show-SuccessMessage -msg "Windows activation completed."
         } else {
             Write-Log "Windows activation not performed. Missing configuration."
+            Show-SystemMessage -msg1 "Windows activation not performed. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
+        Show-ErrorMessage -msg "Error activating Windows: $($_.Exception.Message)" -colour "Red"
         Write-Log "Error activating Windows: $($_.Exception.Message)"
         exit 1
     }
 }
 
-# Download and read the configuration file if it's a URL
-function Get-ConfigFile {
-    param (
-        [string]$configFile
-    )
-    if ($configFile -match "^https?://") {
-        $tempConfigFile = "$env:TEMP\config.ini"
-        Write-Log "Downloading configuration file from: $configFile"
-        Invoke-WebRequest -Uri $configFile -OutFile $tempConfigFile
-        $configFile = $tempConfigFile
-    }
-    return $configFile
-}
+
+
 
 # Main script execution
 if (-not (Test-IsAdmin)) {
