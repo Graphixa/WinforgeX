@@ -1142,23 +1142,56 @@ function Import-Tasks {
         $tasksSection = $config["Tasks"]
         if ($tasksSection) {
             Write-SystemMessage -title "Importing Scheduled Tasks"
+
             foreach ($key in $tasksSection.Keys) {
                 $taskFile = $tasksSection[$key]
 
-                # Download the task file if it's a URL
-                if ($taskFile -match "^https?://") {
-                    $tempTaskFile = "$env:TEMP\$key.xml"
-                    Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
-                    Write-Log "Downloading task file from: $taskFile"
-                    Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
-                    $taskFile = $tempTaskFile
-                }
+                # Check if the key is a folder
+                if ($key -eq "TasksRepository") {
+                    Write-SystemMessage -msg1 "- Downloading all tasks from remote folder: " -msg2 $taskFile
+                    Write-Log "Downloading all tasks from folder: $taskFile"
 
-                # Import the task into Task Scheduler
-                Write-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
-                Write-Log "Importing task: $taskFile"
-                schtasks /create /tn $key /xml $taskFile /f
-                Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
+                    # Download the folder content (assuming it's hosted on GitHub or similar services)
+                    $tempFolder = "$env:TEMP\Tasks"
+                    if (-not (Test-Path $tempFolder)) {
+                        New-Item -ItemType Directory -Path $tempFolder | Out-Null
+                    }
+
+                    # Download all XML files in the folder
+                    $webRequest = Invoke-WebRequest -Uri $taskFile
+                    $xmlFiles = $webRequest.Links | Where-Object { $_.href -match '\.xml$' }
+                    
+                    foreach ($xmlFile in $xmlFiles) {
+                        $fileName = [System.IO.Path]::GetFileName($xmlFile.href)
+                        $fileUrl = "$taskFile$fileName"
+                        $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
+
+                        Write-SystemMessage -msg1 "- Downloading task file: " -msg2 $fileUrl
+                        Write-Log "Downloading task file: $fileUrl"
+                        Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
+
+                        # Import the task
+                        Write-SystemMessage -msg1 "- Importing task: " -msg2 $downloadedFile
+                        Write-Log "Importing task: $downloadedFile"
+                        schtasks /create /tn "$key-$fileName" /xml $downloadedFile /f
+                        Write-SystemMessage -msg1 "- Task $fileName imported successfully." -msg1Color "Green"
+                    }
+                } else {
+                    # Handle individual task files
+                    if ($taskFile -match "^https?://") {
+                        $tempTaskFile = "$env:TEMP\$key.xml"
+                        Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
+                        Write-Log "Downloading task file from: $taskFile"
+                        Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
+                        $taskFile = $tempTaskFile
+                    }
+
+                    # Import the task into Task Scheduler
+                    Write-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
+                    Write-Log "Importing task: $taskFile"
+                    schtasks /create /tn $key /xml $taskFile /f
+                    Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
+                }
             }
             Write-Log "Tasks imported successfully."
             Write-SuccessMessage -msg "Scheduled tasks imported successfully."
@@ -1172,6 +1205,7 @@ function Import-Tasks {
         Return
     }
 }
+
 
 
 # Function to activate Windows

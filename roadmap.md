@@ -4,6 +4,7 @@
 - Enable bitlocker for drives (With our without TPM?) Options: Bitlocker="SystemDrive" or Bitlocker="All"
 - Add chocolatey apps installer i.e. in the INI File:
   - ChocolateyApps="VLC,Steam,EpicGamesStore,Firefox" etc.
+- Take Snapshot BEFORE Running any Winforge application so you can roll back.
 
 ### Tweaks
 - Option to bring back old context menu tweak and other tweaks under a tweaks Key
