@@ -74,22 +74,6 @@ function Read-IniFile {
     return $ini
 }
 
-function Convert-ToBoolInt {
-    param (
-        [string]$value
-    )
-    if ($value -eq "TRUE") {
-        return $true
-    } elseif ($value -eq "FALSE") {
-        return $false
-    } else {
-        throw "Invalid boolean value: $value. Expected 'TRUE' or 'FALSE'."
-    }
-}
-
-
-
-
 # Function to get configuration value by key and section
 function Get-ConfigValue {
     param (
@@ -257,7 +241,7 @@ function RegistryTouch {
         }
     } catch {
         Write-Log "Error Modifying the Registry: $($_.Exception.Message)"
-        Show-ErrorMessage -msg "Error in Modifying the Registry: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Error in Modifying the Registry: $($_.Exception.Message)"
     }
 }
 
@@ -381,7 +365,6 @@ function Install-Applications {
         Write-SystemMessage -title "Installing Applications"
         Write-Log "Installing applications via winget import"
 
-            
         # Download the manifest file if it's a URL
         if ($appManifestFile -match "^https?://") {
             $tempAppManifestFile = "$env:TEMP\appManifest.json"
@@ -389,10 +372,9 @@ function Install-Applications {
             Write-SystemMessage -msg1 "- Downloading app manifest file from: " -msg2 $appManifestFile
             
             try {
+                Invoke-WebRequest -Uri $appManifestFile -OutFile $tempAppManifestFile
                 $appManifestFile = $tempAppManifestFile
-                Invoke-WebRequest -Uri $appManifestFile -OutFile $tempAppManifestFile                
-            }
-            catch {
+            } catch {
                 Write-Log "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)"
                 Write-ErrorMessage -msg "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)" -colour "Red"
                 Return
@@ -401,51 +383,42 @@ function Install-Applications {
             Write-SuccessMessage -msg "App manifest downloaded."
         }
 
-
         try {
             # Reset Winget sources and accept agreements
             Write-Log "Resetting Winget sources and accepting agreements."
             Write-SystemMessage -msg1 "- Resetting Winget sources and accepting agreements."
-                
+            
             winget source reset --force
             winget source update
             winget source list --accept-source-agreements
             
             Write-Log "Winget sources reset and agreements accepted successfully."
             Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
-        }
-        catch {
+        } catch {
             Write-Log "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)" -colour "Red"
+            Return
         }
-            
 
         try {
             Write-Log "Installing applications from manifest file: $appManifestFile"
             Write-SystemMessage -msg1 "- Installing applications from manifest file"
             winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
-        }
-        catch {
+        } catch {
             Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
             Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
+            Return
         }
 
         Write-Log "App installation complete."
         Write-SuccessMessage -msg "Applications installed successfully."
-        Return
-
         
-        else {
-            Write-Log "No app manifest file provided."
-            Write-SystemMessage -msg1 "No app manifest file provided." -msg1Color "Cyan"
-        }
-    }
-    catch {
-        Write-Log "Error processing applications: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error processing applications: $($_.Exception.Message)" -colour "Red"
-        Return
+    } else {
+        Write-Log "No app manifest file provided."
+        Write-SystemMessage -msg1 "No app manifest file provided." -msg1Color "Cyan"
     }
 }
+
 
 
 
@@ -556,12 +529,18 @@ function Install-Fonts {
     }
 }
 
-
 # Function to install Microsoft Office
 function Install-Office {
     try {
         $officeSectionExists = $config.ContainsKey("Office")
         if ($officeSectionExists) {
+            # Check if Office is already installed
+            if (Test-ProgramInstalled 'Microsoft Office' -or Test-ProgramInstalled 'Office') {
+                Write-Log "Microsoft Office is already installed. Skipping installation."
+                Write-SystemMessage -msg1 "Microsoft Office is already installed. Skipping installation." -msg1Color "Cyan"
+                return
+            }
+
             Write-SystemMessage -title "Installing Microsoft Office"
             $requiredKeys = @("LicenseKey", "ProductID", "LanguageID", "UpdatesEnabled", "DisplayLevel", "SetupReboot", "Channel", "OfficeClientEdition")
             if (-not (Validate-RequiredKeys -section "Office" -requiredKeys $requiredKeys)) {
@@ -634,6 +613,7 @@ function Install-Office {
         Return
     }
 }
+
 
 
 # Function to set wallpaper
@@ -772,18 +752,18 @@ function Add-RegistryEntries {
                     RegistryTouch -action "add" -path $path -name $name -type $type -value $value
                 } else {
                     Write-Log "Invalid registry entry format: $key"
-                    Show-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries added successfully."
-            Show-SuccessMessage -msg "Registry entries added successfully."
+            Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
             Write-Log "No registry entries to add. Missing configuration."
             Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
-        Show-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
     }
 }
 
@@ -815,18 +795,18 @@ function Remove-RegistryEntries {
                     RegistryTouch -action "remove" -path $path -name $name
                 } else {
                     Write-Log "Invalid registry entry format: $key"
-                    Show-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries removed successfully."
-            Show-SuccessMessage -msg "Registry entries removed successfully."
+            Write-SuccessMessage -msg "Registry entries removed successfully."
         } else {
             Write-Log "No registry entries to remove. Missing configuration."
             Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
-        Show-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
 
@@ -861,7 +841,7 @@ function Set-PowerSettings {
 # Function to configure Windows updates
 function Set-WindowsUpdates {
     try {
-        $enableAutoUpdates = Get-ConfigValue -section "WindowsUpdate" -key "EnableAutoUpdates"
+        $noAutoUpdate = Get-ConfigValue -section "WindowsUpdate" -key "NoAutoUpdate"
         $auOptions = Get-ConfigValue -section "WindowsUpdate" -key "AUOptions"
         $autoInstallMinorUpdates = Get-ConfigValue -section "WindowsUpdate" -key "AutoInstallMinorUpdates"
         $scheduledInstallDay = Get-ConfigValue -section "WindowsUpdate" -key "ScheduledInstallDay"
@@ -869,10 +849,7 @@ function Set-WindowsUpdates {
 
         Write-SystemMessage -title "Configuring Windows Updates"
 
-        # Convert EnableAutoUpdates to its opposite for NoAutoUpdate
-        $noAutoUpdate = if ($enableAutoUpdates -eq "TRUE") { "FALSE" } else { "TRUE" }
-        
-        Write-Log "EnableAutoUpdates: $enableAutoUpdates"
+        Write-Log "NoAutoUpdate: $noAutoUpdate"
         Write-Log "AUOptions: $auOptions"
         Write-Log "ScheduledInstallDay: $scheduledInstallDay"
         Write-Log "ScheduledInstallTime: $scheduledInstallTime"
@@ -883,8 +860,9 @@ function Set-WindowsUpdates {
             RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 1
             Write-Log "Automatic updates disabled."
             Write-SystemMessage -msg1 "- Automatic updates disabled." -msg1Color "Green"
-        } else {
-            Write-Log "Configuring Windows updates..."
+        } elseif ($noAutoUpdate -eq "FALSE") {
+            Write-Log "Enabling automatic windows updates..."
+            Write-SystemMessage -msg1 "- Enabling automatic updates."
             RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 0
 
             if ($auOptions -and $scheduledInstallDay -and $scheduledInstallTime) {
@@ -904,18 +882,24 @@ function Set-WindowsUpdates {
                 Write-SystemMessage -msg1 "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings." -msg1Color "Yellow"
             }
 
-            if ($autoInstallMinorUpdates) {
-                $autoInstallValue = if ($autoInstallMinorUpdates -eq "TRUE") { 1 } else { 0 }
-                Write-Log "Setting AutoInstallMinorUpdates to: $autoInstallValue"
-                Write-SystemMessage -msg1 "- Setting AutoInstallMinorUpdates to: " -msg2 $autoInstallValue
-                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value $autoInstallValue
+            if ($autoInstallMinorUpdates -eq "TRUE") {
+                Write-Log "Enabling AutoInstallMinorUpdates"
+                Write-SystemMessage -msg1 "- Enabling AutoInstallMinorUpdates."
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value 1
+            } elseif ($autoInstallMinorUpdates -eq "FALSE") {
+                Write-Log "Disabling AutoInstallMinorUpdates"
+                Write-SystemMessage -msg1 "- Disabling AutoInstallMinorUpdates."
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value 0
             } else {
-                Write-Log "No AutoInstallMinorUpdates setting provided."
-                Write-SystemMessage -msg1 "No AutoInstallMinorUpdates setting provided." -msg1Color "Yellow"
+                Write-Log "No valid AutoInstallMinorUpdates setting provided."
+                Write-SystemMessage -msg1 "No valid AutoInstallMinorUpdates setting provided." -msg1Color "Yellow"
             }
 
             Write-Log "Windows updates configured successfully."
             Write-SystemMessage -msg1 "- Windows updates configured successfully." -msg1Color "Green"
+        } else {
+            Write-Log "No valid NoAutoUpdate setting provided."
+            Write-SystemMessage -msg1 "No valid NoAutoUpdate setting provided." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error configuring Windows updates: $($_.Exception.Message)"
@@ -923,6 +907,7 @@ function Set-WindowsUpdates {
         Return
     }
 }
+
 
 
 # Function to set optional windows features and services
@@ -938,12 +923,12 @@ function Set-Services {
                     if ($serviceAction -eq "enabled") {
                         Write-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
                         Write-Log "Enabling service: $serviceName"
-                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart | Out-Null
+                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
                         Write-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
                     } elseif ($serviceAction -eq "disabled") {
                         Write-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
                         Write-Log "Disabling service: $serviceName"
-                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart | Out-Null
+                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
                         Write-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
                     } else {
                         Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg2Color "Red"
@@ -973,10 +958,10 @@ function Set-Services {
 function Set-SecuritySettings {
     try {
         $uacLevel = Get-ConfigValue -section "SecuritySettings" -key "UACLevel"
-        $disableTelemetry = Convert-ToBoolInt (Get-ConfigValue -section "SecuritySettings" -key "DisableTelemetry")
-        $showFileExtensions = Convert-ToBoolInt (Get-ConfigValue -section "SecuritySettings" -key "ShowFileExtensions")
-        $disableCopilot = Convert-ToBoolInt (Get-ConfigValue -section "SecuritySettings" -key "DisableCopilot")
-        $disableOneDrive = Convert-ToBoolInt (Get-ConfigValue -section "SecuritySettings" -key "DisableOneDrive")
+        $disableTelemetry = Get-ConfigValue -section "SecuritySettings" -key "DisableTelemetry"
+        $showFileExtensions = Get-ConfigValue -section "SecuritySettings" -key "ShowFileExtensions"
+        $disableCopilot = Get-ConfigValue -section "SecuritySettings" -key "DisableCopilot"
+        $disableOneDrive = Get-ConfigValue -section "SecuritySettings" -key "DisableOneDrive"
 
         Write-Log "Configuring Security Settings"
         Write-SystemMessage -title "Configuring Security Settings"
@@ -993,13 +978,23 @@ function Set-SecuritySettings {
         }
 
         # Disable/Enable Telemetry
-        Write-SystemMessage -msg1 "- Setting Windows Telemetry..."
-        Write-Log "Setting Windows Telemetry to $disableTelemetry"
-        $telemetryKeys = @(
-            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=$disableTelemetry; type="DWord"},
-            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=$disableTelemetry; type="DWord"},
-            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=$disableTelemetry; type="DWord"}
-        )
+        if ($disableTelemetry -eq "TRUE") {
+            Write-SystemMessage -msg1 "- Disabling Windows Telemetry..."
+            Write-Log "Disabling Windows Telemetry"
+            $telemetryKeys = @(
+                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=0; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=0; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=0; type="DWord"}
+            )
+        } else {
+            Write-SystemMessage -msg1 "- Enabling Windows Telemetry..."
+            Write-Log "Enabling Windows Telemetry"
+            $telemetryKeys = @(
+                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=1; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=1; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=1; type="DWord"}
+            )
+        }
         foreach ($key in $telemetryKeys) {
             RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
         }
@@ -1007,31 +1002,53 @@ function Set-SecuritySettings {
         Write-Log "Windows Telemetry setting applied."
 
         # Show/Hide file extensions
-        Write-SystemMessage -msg1 "- Configuring file type extension visibility..."
-        Write-Log "Configuring file type extension visibility to $showFileExtensions"
-        RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $showFileExtensions
+        if ($showFileExtensions -eq "TRUE") {
+            Write-SystemMessage -msg1 "- Showing file extensions..."
+            Write-Log "Configuring file type extension visibility to show"
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value 0
+        } else {
+            Write-SystemMessage -msg1 "- Hiding file extensions..."
+            Write-Log "Configuring file type extension visibility to hide"
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value 1
+        }
         Write-SystemMessage -msg1 "- File type extension visibility configured." -msg1Color "Green"
         Write-Log "File type extension visibility configured."
 
         # Disable/Enable Copilot
-        Write-SystemMessage -msg1 "- Setting Windows Copilot..."
-        Write-Log "Setting Windows Copilot to $disableCopilot"
-        RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value $disableCopilot
+        if ($disableCopilot -eq "TRUE") {
+            Write-SystemMessage -msg1 "- Disabling Windows Copilot..."
+            Write-Log "Disabling Windows Copilot"
+            RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value 0
+        } else {
+            Write-SystemMessage -msg1 "- Enabling Windows Copilot..."
+            Write-Log "Enabling Windows Copilot"
+            RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value 1
+        }
         Write-SystemMessage -msg1 "- Windows Copilot setting applied." -msg1Color "Green"
         Write-Log "Windows Copilot setting applied."
 
         # Disable/Enable OneDrive
-        Write-SystemMessage -msg1 "- Setting OneDrive..."
-        Write-Log "Setting OneDrive to $disableOneDrive"
-        $oneDriveKeys = @(
-            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=$disableOneDrive; type="DWord"},
-            @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=$disableOneDrive; type="DWord"}
-        )
-        foreach ($key in $oneDriveKeys) {
-            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
-        }
-        if ($disableOneDrive -eq 1) {
+        if ($disableOneDrive -eq "TRUE") {
+            Write-SystemMessage -msg1 "- Disabling OneDrive..."
+            Write-Log "Disabling OneDrive"
+            $oneDriveKeys = @(
+                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=1; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=1; type="DWord"}
+            )
+            foreach ($key in $oneDriveKeys) {
+                RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
+            }
             Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
+        } else {
+            Write-SystemMessage -msg1 "- Enabling OneDrive..."
+            Write-Log "Enabling OneDrive"
+            $oneDriveKeys = @(
+                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=0; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=0; type="DWord"}
+            )
+            foreach ($key in $oneDriveKeys) {
+                RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
+            }
         }
         Write-SystemMessage -msg1 "- OneDrive setting applied." -msg1Color "Green"
         Write-Log "OneDrive setting applied."
@@ -1043,8 +1060,6 @@ function Set-SecuritySettings {
         Return
     }
 }
-
-
 
 
 
@@ -1075,14 +1090,11 @@ function Set-EnvironmentVariables {
 }
 
 
-
-
-
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
-    $installChrome = Convert-ToBoolInt (Get-ConfigValue -section "Google" -key "InstallGoogleChrome")
+    $installChrome = Get-ConfigValue -section "Google" -key "InstallGoogleChrome"
 
-    if ($installChrome) {
+    if ($installChrome -eq "TRUE") {
         Write-SystemMessage -title "Installing Google Chrome Enterprise"
         $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
             'googlechromestandaloneenterprise64.msi'
@@ -1123,11 +1135,12 @@ function Install-ChromeEnterprise {
 }
 
 
+
 # Function to install GCPW
 function Install-GCPW {
-    $installGCPW = Convert-ToBoolInt (Get-ConfigValue -section "Google" -key "InstallGCPW")
+    $installGCPW = Get-ConfigValue -section "Google" -key "InstallGCPW"
 
-    if ($installGCPW) {
+    if ($installGCPW -eq "TRUE") {
         Write-SystemMessage -title "Installing Google Credential Provider for Windows (GCPW)"
         $requiredKeys = @("DomainsAllowedToLogin", "GCPW-EnrollmentToken")
         if (-not (Validate-RequiredKeys -section "Google" -requiredKeys $requiredKeys)) {
@@ -1196,9 +1209,9 @@ function Install-GCPW {
 
 # Function to install Google Drive
 function Install-GoogleDrive {
-    $installGoogleDrive = Convert-ToBoolInt (Get-ConfigValue -section "Google" -key "InstallGoogleDrive")
+    $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
 
-    if ($installGoogleDrive) {
+    if ($installGoogleDrive -eq "TRUE") {
         Write-SystemMessage -title "Installing Google Drive"
         $driveFileName = 'GoogleDriveFSSetup.exe'
         $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
@@ -1230,6 +1243,7 @@ function Install-GoogleDrive {
         Write-SystemMessage -msg1 "Skipping Google Drive installation as per configuration." -msg1Color "Cyan"
     }
 }
+
 
 # Function to import tasks into Task Scheduler
 function Import-Tasks {
@@ -1327,8 +1341,6 @@ function Import-Tasks {
         Return
     }
 }
-
-
 
 
 # Function to activate Windows
