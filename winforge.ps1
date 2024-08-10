@@ -213,19 +213,19 @@ function RegistryTouch {
             # Check if the registry path exists, if not create it
             if (-not (Test-Path $path)) {
                 Write-Log "Registry path does not exist. Creating path: $path"
-                New-Item -Path $path -Force | Out-Null
+                New-Item -Path $path -Force
             }
 
             # Check if the registry item exists
             if (-not (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue)) {
                 Write-Log "Registry item does not exist. Creating item: $name with value: $value"
-                New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force | Out-Null
+                New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force
             } else {
                 # Check if the existing value is different
                 $currentValue = (Get-ItemProperty -Path $path -Name $name).$name
                 if ($currentValue -ne $value) {
                     Write-Log "Registry value differs. Updating item: $name from $currentValue to $value"
-                    Set-ItemProperty -Path $path -Name $name -Value $value -Force | Out-Null
+                    Set-ItemProperty -Path $path -Name $name -Value $value -Force
                 } else {
                     Write-Log "Registry item: $name with value: $value already exists. Skipping."
                 }
@@ -234,7 +234,7 @@ function RegistryTouch {
             # Check if the registry name exists
             if (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue) {
                 Write-Log "Removing registry item: $name from path: $path"
-                Remove-ItemProperty -Path $path -Name $name -Force | Out-Null
+                Remove-ItemProperty -Path $path -Name $name -Force
             } else {
                 Write-Log "Registry item: $name does not exist at path: $path. Skipping."
             }
