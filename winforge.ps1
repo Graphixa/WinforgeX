@@ -201,13 +201,72 @@ function Write-SuccessMessage {
   }
 
 
+# Function to add, modify or remove registry settings
+  function RegistryTouch {
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("add", "remove")]
+        [string]$action,
+
+        [Parameter(Mandatory=$true)]
+        [string]$path,
+
+        [Parameter(Mandatory=$true)]
+        [string]$name,
+
+        [Parameter()]
+        [ValidateSet("String", "ExpandString", "Binary", "DWord", "MultiString", "QWord")]
+        [string]$type = "String",  # Default to String
+
+        [Parameter()]
+        [string]$value
+    )
+
+    try {
+        if ($action -eq "add") {
+            # Check if the registry path exists, if not create it
+            if (-not (Test-Path $path)) {
+                Write-Log "Registry path does not exist. Creating path: $path"
+                New-Item -Path $path -Force | Out-Null
+            }
+
+            # Check if the registry item exists
+            if (-not (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue)) {
+                Write-Log "Registry item does not exist. Creating item: $name with value: $value"
+                New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force | Out-Null
+            } else {
+                # Check if the existing value is different
+                $currentValue = (Get-ItemProperty -Path $path -Name $name).$name
+                if ($currentValue -ne $value) {
+                    Write-Log "Registry value differs. Updating item: $name from $currentValue to $value"
+                    Set-ItemProperty -Path $path -Name $name -Value $value -Force | Out-Null
+                } else {
+                    Write-Log "Registry item: $name with value: $value already exists. Skipping."
+                }
+            }
+        } elseif ($action -eq "remove") {
+            # Check if the registry name exists
+            if (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue) {
+                Write-Log "Removing registry item: $name from path: $path"
+                Remove-ItemProperty -Path $path -Name $name -Force | Out-Null
+            } else {
+                Write-Log "Registry item: $name does not exist at path: $path. Skipping."
+            }
+        }
+    } catch {
+        Write-Log "Error Modifying the Registry: $($_.Exception.Message)"
+        Show-ErrorMessage -msg "Error in Modifying the Registry: $($_.Exception.Message)"
+    }
+}
+
+
 # Function to set computer name
 function Set-ComputerName {
     try {
         $computerName = Get-ConfigValue -section "System" -key "ComputerName"
         if ($computerName) {
             Write-Log "Setting computer name to: $computerName"
-            Rename-Computer -NewName $computerName -Force | Out-Null
+            Rename-Computer -NewName $computerName -Force
             Write-Log "Computer name set successfully."
         } else {
             Write-Log "Computer name not set. Missing configuration."
@@ -607,102 +666,86 @@ function Add-RegistryEntries {
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
-            Write-SystemMessage -title "Adding Registry Entries"
+            Show-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
-                if ($entry.Length -eq 4) {
-                    $keyName = $entry[0].Trim()
-                    $value = $entry[1].Trim()
-                    $type = $entry[2].Trim()
-                    $data = $entry[3].Trim()
+                $entryDict = @{}
+                foreach ($item in $entry) {
+                    $keyValue = $item.Trim() -split "="
+                    $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
+                }
 
-                    Write-Log "Adding registry entry: KeyName=${keyName}, Value=${value}, Type=${type}, Data=${data}"
-                    Write-SystemMessage -msg1 "- Adding: " -msg2 "${keyName}, Value=${value}, Type=${type}, Data=${data}"
-                    cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
+                # Ensure all required fields are present
+                if ($entryDict.ContainsKey("Path") -and $entryDict.ContainsKey("Name") -and $entryDict.ContainsKey("Type") -and $entryDict.ContainsKey("Value")) {
+                    $path = $entryDict["Path"]
+                    $name = $entryDict["Name"]
+                    $type = $entryDict["Type"]
+                    $value = $entryDict["Value"]
+
+                    Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
+                    Show-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
+
+                    # Use RegistryTouch for adding the registry entry
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value
                 } else {
                     Write-Log "Invalid registry entry format: $key"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Show-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries added successfully."
-            Write-SuccessMessage -msg "Registry entries added successfully."
+            Show-SuccessMessage -msg "Registry entries added successfully."
         } else {
             Write-Log "No registry entries to add. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
+            Show-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
-        Return
+        Show-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
     }
 }
+
+
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
-            Write-SystemMessage -title "Removing Registry Entries"
+            Show-SystemMessage -title "Removing Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
-                if ($entry.Length -eq 2) {
-                    $keyName = $entry[0].Trim()
-                    $value = $entry[1].Trim()
+                $entryDict = @{}
+                foreach ($item in $entry) {
+                    $keyValue = $item.Trim() -split "="
+                    $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
+                }
 
-                    Write-Log "Removing registry entry: KeyName=${keyName}, Value=${value}"
-                    Write-SystemMessage -msg1 "- Removing: " -msg2 "${keyName}, Value=${value}"
-                    cmd.exe /c "reg delete ${keyName} /v ${value} /f"
+                # Ensure all required fields are present
+                if ($entryDict.ContainsKey("Path") -and $entryDict.ContainsKey("Name")) {
+                    $path = $entryDict["Path"]
+                    $name = $entryDict["Name"]
+
+                    Write-Log "Removing registry entry: Path=$path, Name=$name"
+                    Show-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
+
+                    # Use RegistryTouch for removing the registry entry
+                    RegistryTouch -action "remove" -path $path -name $name
                 } else {
                     Write-Log "Invalid registry entry format: $key"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Show-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries removed successfully."
-            Write-SuccessMessage -msg "Registry entries removed successfully."
+            Show-SuccessMessage -msg "Registry entries removed successfully."
         } else {
             Write-Log "No registry entries to remove. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
+            Show-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
-        Return
+        Show-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
-
-
-
-
-# Function to configure DNS settings
-function Set-DNSSettings {
-    try {
-        $interfaceAlias = Get-ConfigValue -section "Network" -key "Interface"
-        $dns1 = Get-ConfigValue -section "Network" -key "DNS1"
-        $dns2 = Get-ConfigValue -section "Network" -key "DNS2"
-
-        if ($interfaceAlias -and $dns1 -and $dns2) {
-            Write-SystemMessage -title "Configuring DNS Settings"
-            Write-Log "Configuring DNS settings for interface: $interfaceAlias"
-            Write-SystemMessage -msg1 "- Setting primary DNS: " -msg2 $dns1
-            Write-SystemMessage -msg1 "- Setting secondary DNS: " -msg2 $dns2
-
-            $dnsServers = @($dns1, $dns2)
-            Set-DnsClientServerAddress -InterfaceAlias $interfaceAlias -ServerAddresses $dnsServers
-
-            Write-Log "DNS settings configured successfully: $dnsServers"
-            Write-SuccessMessage -msg "DNS settings configured successfully."
-        } else {
-            Write-Log "Error: Both DNS1 and DNS2 must be provided in the configuration file."
-            Write-ErrorMessage -msg "Error: Both DNS1 and DNS2 must be provided in the configuration file."
-            Return
-        }
-    } catch {
-        Write-Log "Error configuring DNS settings: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error configuring DNS settings: $($_.Exception.Message)"
-        Return
-    }
-}
-
 
 
 
@@ -736,7 +779,7 @@ function Set-PowerSettings {
 # Function to configure Windows updates
 function Set-WindowsUpdates {
     try {
-        $noAutoUpdate = Get-ConfigValue -section "WindowsUpdate" -key "NoAutoUpdate"
+        $enableAutoUpdates = Get-ConfigValue -section "WindowsUpdate" -key "EnableAutoUpdates"
         $auOptions = Get-ConfigValue -section "WindowsUpdate" -key "AUOptions"
         $autoInstallMinorUpdates = Get-ConfigValue -section "WindowsUpdate" -key "AutoInstallMinorUpdates"
         $scheduledInstallDay = Get-ConfigValue -section "WindowsUpdate" -key "ScheduledInstallDay"
@@ -744,32 +787,37 @@ function Set-WindowsUpdates {
 
         Write-SystemMessage -title "Configuring Windows Updates"
 
+        # Set NoAutoUpdate based on EnableAutoUpdates value
+        $noAutoUpdate = if ($enableAutoUpdates -eq "TRUE") { "FALSE" } else { "TRUE" }
+        
+        Write-Log "EnableAutoUpdates: $enableAutoUpdates"
         Write-Log "AUOptions: $auOptions"
         Write-Log "ScheduledInstallDay: $scheduledInstallDay"
         Write-Log "ScheduledInstallTime: $scheduledInstallTime"
 
-        
         if ($noAutoUpdate -eq "TRUE") {
             Write-Log "Disabling automatic windows updates..."
             Write-SystemMessage -msg1 "- Disabling all automatic updates."
-            Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Value 1 -Type DWord -Force
+            RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 1
             Write-Log "Automatic updates disabled."
             Write-SystemMessage -msg1 "- Automatic updates disabled." -msg1Color "Green"
         } else {
             Write-Log "Configuring Windows updates..."
 
+            RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 0
+
             if ($auOptions -and $scheduledInstallDay -and $scheduledInstallTime) {
                 Write-Log "Setting AUOptions to: $auOptions"
                 Write-SystemMessage -msg1 "- Setting AUOptions to: " -msg2 $auOptions
-                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Value $auOptions -Type DWord -Force
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AUOptions" -type "DWord" -value $auOptions
 
                 Write-Log "Setting ScheduledInstallDay to: $scheduledInstallDay"
                 Write-SystemMessage -msg1 "- Setting ScheduledInstallDay to: " -msg2 $scheduledInstallDay
-                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallDay" -Value $scheduledInstallDay -Type DWord -Force
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "ScheduledInstallDay" -type "DWord" -value $scheduledInstallDay
 
                 Write-Log "Setting ScheduledInstallTime to: $scheduledInstallTime"
                 Write-SystemMessage -msg1 "- Setting ScheduledInstallTime to: " -msg2 $scheduledInstallTime
-                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "ScheduledInstallTime" -Value $scheduledInstallTime -Type DWord -Force
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "ScheduledInstallTime" -type "DWord" -value $scheduledInstallTime
             } else {
                 Write-Log "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings."
                 Write-SystemMessage -msg1 "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings." -msg1Color "Yellow"
@@ -779,7 +827,7 @@ function Set-WindowsUpdates {
                 $autoInstallValue = if ($autoInstallMinorUpdates -eq "TRUE") { 1 } else { 0 }
                 Write-Log "Setting AutoInstallMinorUpdates to: $autoInstallValue"
                 Write-SystemMessage -msg1 "- Setting AutoInstallMinorUpdates to: " -msg2 $autoInstallValue
-                Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AutoInstallMinorUpdates" -Value $autoInstallValue -Type DWord -Force
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value $autoInstallValue
             } else {
                 Write-Log "No AutoInstallMinorUpdates setting provided."
                 Write-SystemMessage -msg1 "No AutoInstallMinorUpdates setting provided." -msg1Color "Yellow"
@@ -794,6 +842,7 @@ function Set-WindowsUpdates {
         Return
     }
 }
+
 
 
 
