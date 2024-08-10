@@ -1383,10 +1383,11 @@ Install-GoogleDrive
 Activate-Windows
 
 # Remove the configuration file if it was downloaded
-if ($configFile -match "$env:TEMP\\config.ini") {
+if ($configFile -match [regex]::Escape("$env:TEMP\config.ini")) {
     Remove-Item -Path $configFile -Force -ErrorAction SilentlyContinue
     Write-Log "Temporary configuration file removed."
 }
+
 
 Write-Log "System configuration completed successfully."
 Write-SystemMessage "System configuration completed successfully."
