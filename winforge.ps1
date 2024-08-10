@@ -306,10 +306,15 @@ function Set-Locale {
         $locale = Get-ConfigValue -section "System" -key "Locale"
         if ($locale) {
             Write-Log "Setting locale to: $locale"
-            Set-WinUILanguageOverride -Language $locale
-            Set-WinSystemLocale -SystemLocale $locale
-            Set-WinUserLanguageList $locale -Force
-            Write-Log "Locale set successfully."
+            # Validate the locale against a list of supported locales if necessary
+            if (Get-WinUserLanguageList | Where-Object { $_.LanguageTag -eq $locale }) {
+                Set-WinUILanguageOverride -Language $locale
+                Set-WinSystemLocale -SystemLocale $locale
+                Set-WinUserLanguageList $locale -Force
+                Write-Log "Locale set successfully."
+            } else {
+                Write-Log "Invalid or unsupported locale: $locale"
+            }
         } else {
             Write-Log "Locale not set. Missing configuration."
         }
@@ -318,6 +323,7 @@ function Set-Locale {
         Return
     }
 }
+
 
 # Function to set timezone
 function Set-SystemTimezone {
@@ -380,6 +386,25 @@ function Install-Applications {
                 Invoke-WebRequest -Uri $appManifestFile -OutFile $tempAppManifestFile
                 $appManifestFile = $tempAppManifestFile
             }
+
+
+            try {
+                # Reset Winget sources and accept agreements
+                Write-Log "Resetting Winget sources and accepting agreements."
+                Write-SystemMessage -msg1 "- Resetting Winget sources and accepting agreements."
+                
+                winget source reset --force
+                winget source update
+                winget source list --accept-source-agreements
+            
+                Write-Log "Winget sources reset and agreements accepted successfully."
+                Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
+            } catch {
+                Write-Log "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)" -colour "Red"
+                Return
+            }
+            
 
             try {
                 Write-SystemMessage -msg1 "- Importing applications from manifest file"

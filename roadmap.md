@@ -22,3 +22,6 @@
 [] Fix Install-Apps function (Currently using just VLC for --id in winget and not working), need to find a way to have the apps appear as a list within the INI config file.
 [] Check if Windows Features are already enabled/disabled and skip if config and current state are the same.
 [] Set-ComputerName needs to have a check that checks if the computername is different from the config file.
+Check if Office is already installed and skip if it is.
+
+
