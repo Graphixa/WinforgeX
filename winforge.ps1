@@ -202,7 +202,7 @@ function Write-SuccessMessage {
 
 
 # Function to add, modify or remove registry settings
-  function RegistryTouch {
+function RegistryTouch {
     param (
         [Parameter(Mandatory=$true)]
         [ValidateSet("add", "remove")]
@@ -256,6 +256,30 @@ function Write-SuccessMessage {
     } catch {
         Write-Log "Error Modifying the Registry: $($_.Exception.Message)"
         Show-ErrorMessage -msg "Error in Modifying the Registry: $($_.Exception.Message)"
+    }
+}
+
+function Set-SystemCheckpoint {
+    $date = Get-Date -Format "dd/MM/yyyy"
+    $snapshotName = "Winforge - $date"
+  
+    try {
+        Write-Log "Creating system restore point. Snapshot Name: $snapshotName"
+        Write-SystemMessage -title "Creating System Restore Point" -msg1 "Snapshot Name: " -msg2 $snapshotName
+        
+        # Ensure system restore is enabled on the system drive
+        Enable-ComputerRestore -Drive "$env:systemdrive"
+        
+        # Create the system restore point
+        Checkpoint-Computer -Description $snapshotName -RestorePointType "MODIFY_SETTINGS" -Verbose
+        
+        Write-Log "System restore point created successfully."
+        Write-SuccessMessage -msg "System restore point created successfully."
+
+    } catch {
+        Write-Log "Error creating system restore point: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to create system restore point: $($_.Exception.Message)" -colour "Red"
+        Return
     }
 }
 
@@ -323,6 +347,23 @@ function Set-SystemTimezone {
     }
 }
 
+# Function to test if a program is installed
+function Test-ProgramInstalled {
+    param(
+        [string]$ProgramName
+    )
+
+    $InstalledSoftware = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall" |
+                         ForEach-Object { [PSCustomObject]@{ 
+                            DisplayName = $_.GetValue('DisplayName')
+                            DisplayVersion = $_.GetValue('DisplayVersion')
+                        }}
+
+    # Check if the partial program name exists in the filtered list
+    $isProgramInstalled = $InstalledSoftware | Where-Object { $_.DisplayName -like "*$ProgramName*" }
+
+    return $isProgramInstalled
+}
 
 # Function to install applications via winget using manifest files
 function Install-Applications {
@@ -749,7 +790,6 @@ function Remove-RegistryEntries {
 
 
 
-
 # Function to configure power settings
 function Set-PowerSettings {
     try {
@@ -906,7 +946,7 @@ function Set-SecuritySettings {
         if ($uacLevel) {
             Write-SystemMessage -msg1 "- Setting UAC level to: " -msg2 $uacLevel
             Write-Log "Setting UAC level to: $uacLevel"
-            Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value $uacLevel
+            RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel
             Write-SystemMessage -msg1 "- UAC level set to $uacLevel." -msg1Color "Green"
         } else {
             Write-ErrorMessage -msg "UAC level not set. Missing configuration." -colour "Cyan"
@@ -917,13 +957,12 @@ function Set-SecuritySettings {
         Write-SystemMessage -msg1 "- Setting Windows Telemetry..."
         Write-Log "Setting Windows Telemetry to $disableTelemetry"
         $telemetryKeys = @(
-            "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection -Name AllowTelemetry -Value $disableTelemetry -Type DWord",
-            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection -Name AllowTelemetry -Value $disableTelemetry -Type DWord",
-            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection -Name MaxTelemetryAllowed -Value $disableTelemetry -Type DWord"
+            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=$disableTelemetry; type="DWord"},
+            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=$disableTelemetry; type="DWord"},
+            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=$disableTelemetry; type="DWord"}
         )
         foreach ($key in $telemetryKeys) {
-            $path, $name, $value, $type = $key -split " -"
-            Set-ItemProperty -Path $path -Name $name -Value $value -Type $type
+            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
         }
         Write-SystemMessage -msg1 "- Windows Telemetry setting applied." -msg1Color "Green"
         Write-Log "Windows Telemetry setting applied."
@@ -931,14 +970,14 @@ function Set-SecuritySettings {
         # Show/Hide file extensions
         Write-SystemMessage -msg1 "- Configuring file type extension visibility..."
         Write-Log "Configuring file type extension visibility to $showFileExtensions"
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value $showFileExtensions
+        RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $showFileExtensions
         Write-SystemMessage -msg1 "- File type extension visibility configured." -msg1Color "Green"
         Write-Log "File type extension visibility configured."
 
         # Disable/Enable Copilot
         Write-SystemMessage -msg1 "- Setting Windows Copilot..."
         Write-Log "Setting Windows Copilot to $disableCopilot"
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "CopilotEnabled" -Value $disableCopilot -Type DWord
+        RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value $disableCopilot
         Write-SystemMessage -msg1 "- Windows Copilot setting applied." -msg1Color "Green"
         Write-Log "Windows Copilot setting applied."
 
@@ -946,12 +985,11 @@ function Set-SecuritySettings {
         Write-SystemMessage -msg1 "- Setting OneDrive..."
         Write-Log "Setting OneDrive to $disableOneDrive"
         $oneDriveKeys = @(
-            "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive -Name DisableFileSyncNGSC -Value $disableOneDrive -Type DWord",
-            "HKLM:\SOFTWARE\Microsoft\OneDrive -Name PreventNetworkTrafficPreWindows10Apps -Value $disableOneDrive -Type DWord"
+            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=$disableOneDrive; type="DWord"},
+            @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=$disableOneDrive; type="DWord"}
         )
         foreach ($key in $oneDriveKeys) {
-            $path, $name, $value, $type = $key -split " -"
-            Set-ItemProperty -Path $path -Name $name -Value $value -Type $type
+            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
         }
         if ($disableOneDrive -eq 1) {
             Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
@@ -966,6 +1004,7 @@ function Set-SecuritySettings {
         Return
     }
 }
+
 
 
 
@@ -998,23 +1037,7 @@ function Set-EnvironmentVariables {
 
 
 
-# Function to test if a program is installed
-function Test-ProgramInstalled {
-    param(
-        [string]$ProgramName
-    )
 
-    $InstalledSoftware = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall" |
-                         ForEach-Object { [PSCustomObject]@{ 
-                            DisplayName = $_.GetValue('DisplayName')
-                            DisplayVersion = $_.GetValue('DisplayVersion')
-                        }}
-
-    # Check if the partial program name exists in the filtered list
-    $isProgramInstalled = $InstalledSoftware | Where-Object { $_.DisplayName -like "*$ProgramName*" }
-
-    return $isProgramInstalled
-}
 
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
@@ -1152,22 +1175,7 @@ function Install-GoogleDrive {
                 Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent' -Wait
                 Write-Log 'Google Drive Installation completed successfully!'
                 Write-SystemMessage -msg1 "- Google Drive installed successfully." -msg1Color "Green"
-                try {
-                    Write-SystemMessage -msg1 "- Setting Google Drive Configurations"
-                    Write-Log "Setting Google Drive Configurations"
-                    $driveRegistryPath = 'HKLM:\SOFTWARE\Google\DriveFS'
-                    New-Item -Path $driveRegistryPath -Force -ErrorAction Stop
-                    Set-ItemProperty -Path $driveRegistryPath -Name 'AutoStartOnLogin' -Value 1 -Type DWord -Force -ErrorAction Stop
-                    Set-ItemProperty -Path $driveRegistryPath -Name 'DefaultWebBrowser' -Value "$env:systemdrive\Program Files\Google\Chrome\Application\chrome.exe" -Type String -Force -ErrorAction Stop
-                    Set-ItemProperty -Path $driveRegistryPath -Name 'OpenOfficeFilesInDocs' -Value 0 -Type DWord -Force -ErrorAction Stop
-
-                    Write-Log 'Google Drive policies have been set'
-                    Write-SystemMessage -msg1 "- Google Drive policies set successfully." -msg1Color "Green"
-                } catch {
-                    Write-ErrorMessage -msg "Google Drive policies failed to be added to the registry: $($_.Exception.Message)"
-                    Write-Log "Google Drive policies failed to be added to the registry"
-                    Write-Log "Error: $($_.Exception.Message)"
-                }
+                
             } catch {
                 Write-ErrorMessage -msg "Google Drive installation failed: $($_.Exception.Message)" -colour "Red"
                 Write-Log "Installation failed!"
@@ -1304,6 +1312,7 @@ try {
 }
 
 # Execute functions
+Set-SystemCheckpoint
 Set-ComputerName
 Set-Locale
 Set-SystemTimezone
@@ -1313,7 +1322,6 @@ Install-Applications
 Install-Office
 Add-RegistryEntries
 Remove-RegistryEntries
-Set-DNSSettings
 Set-PowerSettings
 Set-WindowsUpdates
 Set-SecuritySettings
