@@ -390,7 +390,6 @@ function Install-Applications {
             
             winget source reset --force
             winget source update
-            winget source list --accept-source-agreements
             
             Write-Log "Winget sources reset and agreements accepted successfully."
             Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
@@ -403,7 +402,7 @@ function Install-Applications {
         try {
             Write-Log "Installing applications from manifest file: $appManifestFile"
             Write-SystemMessage -msg1 "- Installing applications from manifest file"
-            winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
+            winget import -i $appManifestFile --accept-package-agreements --ignore-versions
         } catch {
             Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
             Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
@@ -973,7 +972,7 @@ function Set-SecuritySettings {
             RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel
             Write-SystemMessage -msg1 "- UAC level set to $uacLevel." -msg1Color "Green"
         } else {
-            Write-ErrorMessage -msg "UAC level not set. Missing configuration." -colour "Cyan"
+            Write-ErrorMessage -msg "UAC level not set. Missing configuration."
             Write-Log "UAC level not set. Missing configuration."
         }
 
@@ -981,20 +980,21 @@ function Set-SecuritySettings {
         if ($disableTelemetry -eq "TRUE") {
             Write-SystemMessage -msg1 "- Disabling Windows Telemetry..."
             Write-Log "Disabling Windows Telemetry"
-            $telemetryKeys = @(
-                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=0; type="DWord"},
-                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=0; type="DWord"},
-                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=0; type="DWord"}
-            )
-        } else {
+            $telemetryValue = 0
+        } elseif ($disableTelemetry -eq "FALSE") {
             Write-SystemMessage -msg1 "- Enabling Windows Telemetry..."
             Write-Log "Enabling Windows Telemetry"
-            $telemetryKeys = @(
-                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=1; type="DWord"},
-                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=1; type="DWord"},
-                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=1; type="DWord"}
-            )
+            $telemetryValue = 1
+        } else {
+            Write-ErrorMessage -msg "Invalid value for DisableTelemetry: $disableTelemetry"
+            Write-Log "Invalid value for DisableTelemetry: $disableTelemetry"
+            Return
         }
+        $telemetryKeys = @(
+            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=$telemetryValue; type="DWord"},
+            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=$telemetryValue; type="DWord"},
+            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=$telemetryValue; type="DWord"}
+        )
         foreach ($key in $telemetryKeys) {
             RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
         }
@@ -1005,12 +1005,17 @@ function Set-SecuritySettings {
         if ($showFileExtensions -eq "TRUE") {
             Write-SystemMessage -msg1 "- Showing file extensions..."
             Write-Log "Configuring file type extension visibility to show"
-            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value 0
-        } else {
+            $fileExtValue = 0
+        } elseif ($showFileExtensions -eq "FALSE") {
             Write-SystemMessage -msg1 "- Hiding file extensions..."
             Write-Log "Configuring file type extension visibility to hide"
-            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value 1
+            $fileExtValue = 1
+        } else {
+            Write-ErrorMessage -msg "Invalid value for ShowFileExtensions: $showFileExtensions"
+            Write-Log "Invalid value for ShowFileExtensions: $showFileExtensions"
+            Return
         }
+        RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $fileExtValue
         Write-SystemMessage -msg1 "- File type extension visibility configured." -msg1Color "Green"
         Write-Log "File type extension visibility configured."
 
@@ -1018,12 +1023,17 @@ function Set-SecuritySettings {
         if ($disableCopilot -eq "TRUE") {
             Write-SystemMessage -msg1 "- Disabling Windows Copilot..."
             Write-Log "Disabling Windows Copilot"
-            RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value 0
-        } else {
+            $copilotValue = 0
+        } elseif ($disableCopilot -eq "FALSE") {
             Write-SystemMessage -msg1 "- Enabling Windows Copilot..."
             Write-Log "Enabling Windows Copilot"
-            RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value 1
+            $copilotValue = 1
+        } else {
+            Write-ErrorMessage -msg "Invalid value for DisableCopilot: $disableCopilot"
+            Write-Log "Invalid value for DisableCopilot: $disableCopilot"
+            Return
         }
+        RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value $copilotValue
         Write-SystemMessage -msg1 "- Windows Copilot setting applied." -msg1Color "Green"
         Write-Log "Windows Copilot setting applied."
 
@@ -1031,24 +1041,25 @@ function Set-SecuritySettings {
         if ($disableOneDrive -eq "TRUE") {
             Write-SystemMessage -msg1 "- Disabling OneDrive..."
             Write-Log "Disabling OneDrive"
-            $oneDriveKeys = @(
-                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=1; type="DWord"},
-                @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=1; type="DWord"}
-            )
-            foreach ($key in $oneDriveKeys) {
-                RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
-            }
-            Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
-        } else {
+            $oneDriveValue = 1
+        } elseif ($disableOneDrive -eq "FALSE") {
             Write-SystemMessage -msg1 "- Enabling OneDrive..."
             Write-Log "Enabling OneDrive"
-            $oneDriveKeys = @(
-                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=0; type="DWord"},
-                @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=0; type="DWord"}
-            )
-            foreach ($key in $oneDriveKeys) {
-                RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
-            }
+            $oneDriveValue = 0
+        } else {
+            Write-ErrorMessage -msg "Invalid value for DisableOneDrive: $disableOneDrive"
+            Write-Log "Invalid value for DisableOneDrive: $disableOneDrive"
+            Return
+        }
+        $oneDriveKeys = @(
+            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=$oneDriveValue; type="DWord"},
+            @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=$oneDriveValue; type="DWord"}
+        )
+        foreach ($key in $oneDriveKeys) {
+            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
+        }
+        if ($disableOneDrive -eq "TRUE") {
+            Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
         }
         Write-SystemMessage -msg1 "- OneDrive setting applied." -msg1Color "Green"
         Write-Log "OneDrive setting applied."
@@ -1060,6 +1071,7 @@ function Set-SecuritySettings {
         Return
     }
 }
+
 
 
 
