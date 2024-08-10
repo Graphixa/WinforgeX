@@ -78,12 +78,15 @@ function Convert-ToBoolInt {
     param (
         [string]$value
     )
-    switch ($value.ToUpper()) {
-        "TRUE" { return 1 }
-        "FALSE" { return 0 }
-        default { throw "Invalid boolean value: $value. Expected 'TRUE' or 'FALSE'." }
+    if ($value -eq "TRUE") {
+        return $true
+    } elseif ($value -eq "FALSE") {
+        return $false
+    } else {
+        throw "Invalid boolean value: $value. Expected 'TRUE' or 'FALSE'."
     }
 }
+
 
 
 
@@ -188,14 +191,14 @@ function Write-ErrorMessage {
 function Write-SuccessMessage {
     param (
       [Parameter()]
-      $msg = "SUCCESS",
+      $msg = "COMPLETE",
   
       [Parameter()]
       $msgColor = 'Black'
     )
   
     Write-Host
-    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor Cyan
+    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor Green
     Write-Host
   }
 
@@ -372,57 +375,72 @@ function Test-ProgramInstalled {
 
 # Function to install applications via winget using manifest files
 function Install-Applications {
-    try {
-        $appManifestFile = Get-ConfigValue -section "Applications" -key "WingetAppManifest"
-        if ($appManifestFile) {
-            Write-SystemMessage -title "Installing Applications"
-            Write-Log "Installing applications using manifest file: $appManifestFile"
 
-            # Download the manifest file if it's a URL
-            if ($appManifestFile -match "^https?://") {
-                $tempAppManifestFile = "$env:TEMP\appManifest.json"
-                Write-Log "Downloading app manifest file from: $appManifestFile"
-                Write-SystemMessage -msg1 "- Downloading app manifest file"
-                Invoke-WebRequest -Uri $appManifestFile -OutFile $tempAppManifestFile
-                $appManifestFile = $tempAppManifestFile
-            }
+    $appManifestFile = Get-ConfigValue -section "Applications" -key "WingetAppManifest"
+    if ($appManifestFile) {
+        Write-SystemMessage -title "Installing Applications"
+        Write-Log "Installing applications via winget import"
 
-
-            try {
-                # Reset Winget sources and accept agreements
-                Write-Log "Resetting Winget sources and accepting agreements."
-                Write-SystemMessage -msg1 "- Resetting Winget sources and accepting agreements."
-                
-                winget source reset --force
-                winget source update
-                winget source list --accept-source-agreements
             
-                Write-Log "Winget sources reset and agreements accepted successfully."
-                Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
-            } catch {
-                Write-Log "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)" -colour "Red"
+        # Download the manifest file if it's a URL
+        if ($appManifestFile -match "^https?://") {
+            $tempAppManifestFile = "$env:TEMP\appManifest.json"
+            Write-Log "Downloading app manifest file from: $appManifestFile"
+            Write-SystemMessage -msg1 "- Downloading app manifest file from: " -msg2 $appManifestFile
+            
+            try {
+                $appManifestFile = $tempAppManifestFile
+                Invoke-WebRequest -Uri $appManifestFile -OutFile $tempAppManifestFile                
+            }
+            catch {
+                Write-Log "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)" -colour "Red"
                 Return
             }
+
+            Write-SuccessMessage -msg "App manifest downloaded."
+        }
+
+
+        try {
+            # Reset Winget sources and accept agreements
+            Write-Log "Resetting Winget sources and accepting agreements."
+            Write-SystemMessage -msg1 "- Resetting Winget sources and accepting agreements."
+                
+            winget source reset --force
+            winget source update
+            winget source list --accept-source-agreements
+            
+            Write-Log "Winget sources reset and agreements accepted successfully."
+            Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
+        }
+        catch {
+            Write-Log "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)" -colour "Red"
+        }
             
 
-            try {
-                Write-SystemMessage -msg1 "- Importing applications from manifest file"
-                winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
-                Write-Log "Applications installed using manifest file: $appManifestFile"
-                Write-SystemMessage -msg1 "- Applications installed successfully." -msg1Color "Green"
-            } catch {
-                Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
-            }
+        try {
+            Write-Log "Installing applications from manifest file: $appManifestFile"
+            Write-SystemMessage -msg1 "- Installing applications from manifest file"
+            winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
+        }
+        catch {
+            Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
+        }
 
-            Write-Log "Applications installation completed."
-            Write-SuccessMessage
-        } else {
+        Write-Log "App installation complete."
+        Write-SuccessMessage -msg "Applications installed successfully."
+        Return
+
+        
+        else {
             Write-Log "No app manifest file provided."
             Write-SystemMessage -msg1 "No app manifest file provided." -msg1Color "Cyan"
         }
-    } catch {
+    }
+    catch {
         Write-Log "Error processing applications: $($_.Exception.Message)"
         Write-ErrorMessage -msg "Error processing applications: $($_.Exception.Message)" -colour "Red"
         Return
@@ -650,11 +668,12 @@ function Set-Wallpaper {
             )
 
             foreach ($item in $registryItems) {
-                New-ItemProperty -Path $registryFullPath -Name $item.Name -Value $item.Value -PropertyType $item.Type -Force
+                New-ItemProperty -Path $registryFullPath -Name $item.Name -Value $item.Value -PropertyType $item.Type -Force | Out-Null
             }
 
-            Stop-Process -name explorer
-            Start-Process explorer
+            Stop-Process -Name explorer
+            Start-Sleep -Seconds 5
+            if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
 
             Write-Log "Wallpaper set successfully."
             Write-SuccessMessage -msg "Wallpaper set successfully."
@@ -703,11 +722,12 @@ function Set-LockScreenImage {
             )
 
             foreach ($item in $registryItems) {
-                New-ItemProperty -Path $registryFullPath -Name $item.Name -Value $item.Value -PropertyType $item.Type -Force
+                New-ItemProperty -Path $registryFullPath -Name $item.Name -Value $item.Value -PropertyType $item.Type -Force | Out-Null
             }
 
-            Stop-Process -name explorer
-            Start-Process explorer
+            Stop-Process -Name explorer
+            Start-Sleep -Seconds 5
+            if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
 
             Write-Log "Lock screen image set successfully."
             Write-SuccessMessage -msg "Lock screen image set successfully."
@@ -918,12 +938,12 @@ function Set-Services {
                     if ($serviceAction -eq "enabled") {
                         Write-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
                         Write-Log "Enabling service: $serviceName"
-                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart | Out-Null
                         Write-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
                     } elseif ($serviceAction -eq "disabled") {
                         Write-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
                         Write-Log "Disabling service: $serviceName"
-                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart
+                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart | Out-Null
                         Write-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
                     } else {
                         Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg2Color "Red"
@@ -1060,9 +1080,9 @@ function Set-EnvironmentVariables {
 
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
-    $installChrome = Get-ConfigValue -section "Google" -key "InstallGoogleChrome"
+    $installChrome = Convert-ToBoolInt (Get-ConfigValue -section "Google" -key "InstallGoogleChrome")
 
-    if ($installChrome -eq "True") {
+    if ($installChrome) {
         Write-SystemMessage -title "Installing Google Chrome Enterprise"
         $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
             'googlechromestandaloneenterprise64.msi'
@@ -1105,9 +1125,9 @@ function Install-ChromeEnterprise {
 
 # Function to install GCPW
 function Install-GCPW {
-    $installGCPW = Get-ConfigValue -section "Google" -key "InstallGCPW"
+    $installGCPW = Convert-ToBoolInt (Get-ConfigValue -section "Google" -key "InstallGCPW")
 
-    if ($installGCPW -eq "True") {
+    if ($installGCPW) {
         Write-SystemMessage -title "Installing Google Credential Provider for Windows (GCPW)"
         $requiredKeys = @("DomainsAllowedToLogin", "GCPW-EnrollmentToken")
         if (-not (Validate-RequiredKeys -section "Google" -requiredKeys $requiredKeys)) {
@@ -1173,11 +1193,12 @@ function Install-GCPW {
 }
 
 
+
 # Function to install Google Drive
 function Install-GoogleDrive {
-    $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
+    $installGoogleDrive = Convert-ToBoolInt (Get-ConfigValue -section "Google" -key "InstallGoogleDrive")
 
-    if ($installGoogleDrive -eq "True") {
+    if ($installGoogleDrive) {
         Write-SystemMessage -title "Installing Google Drive"
         $driveFileName = 'GoogleDriveFSSetup.exe'
         $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
@@ -1209,8 +1230,6 @@ function Install-GoogleDrive {
         Write-SystemMessage -msg1 "Skipping Google Drive installation as per configuration." -msg1Color "Cyan"
     }
 }
-
-
 
 # Function to import tasks into Task Scheduler
 function Import-Tasks {
