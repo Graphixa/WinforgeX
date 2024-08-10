@@ -1342,7 +1342,6 @@ function Activate-Windows {
             Write-SystemMessage -msg1 "- Activating Windows with product key: " -msg2 $productKey
             Write-Log "Activating Windows with product key: $productKey and version: $version"
             slmgr.vbs /ipk $productKey
-            slmgr.vbs /skms kms.server.address
             slmgr.vbs /ato
             Write-Log "Windows activated successfully."
             Write-SystemMessage -msg1 "- Windows activated successfully." -msg1Color "Green"
