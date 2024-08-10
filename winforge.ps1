@@ -78,14 +78,13 @@ function Convert-ToBoolInt {
     param (
         [string]$value
     )
-    if ($value -eq "TRUE") {
-        return 1
-    } elseif ($value -eq "FALSE") {
-        return 0
-    } else {
-        throw "Invalid boolean value: $value. Expected 'TRUE' or 'FALSE'."
+    switch ($value.ToUpper()) {
+        "TRUE" { return 1 }
+        "FALSE" { return 0 }
+        default { throw "Invalid boolean value: $value. Expected 'TRUE' or 'FALSE'." }
     }
 }
+
 
 
 # Function to get configuration value by key and section
@@ -395,8 +394,8 @@ function Install-Applications {
             Write-Log "Applications installation completed."
             Write-SuccessMessage
         } else {
-            Write-Log "No app manifest file provided or missing configuration."
-            Write-SystemMessage -msg1 "No app manifest file provided or missing configuration." -msg1Color "Cyan"
+            Write-Log "No app manifest file provided."
+            Write-SystemMessage -msg1 "No app manifest file provided." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error processing applications: $($_.Exception.Message)"
@@ -513,8 +512,6 @@ function Install-Fonts {
         Return
     }
 }
-
-
 
 
 # Function to install Microsoft Office
@@ -707,7 +704,7 @@ function Add-RegistryEntries {
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
-            Show-SystemMessage -title "Adding Registry Entries"
+            Write-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 $entryDict = @{}
@@ -724,7 +721,7 @@ function Add-RegistryEntries {
                     $value = $entryDict["Value"]
 
                     Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
-                    Show-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
+                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
 
                     # Use RegistryTouch for adding the registry entry
                     RegistryTouch -action "add" -path $path -name $name -type $type -value $value
@@ -737,7 +734,7 @@ function Add-RegistryEntries {
             Show-SuccessMessage -msg "Registry entries added successfully."
         } else {
             Write-Log "No registry entries to add. Missing configuration."
-            Show-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
+            Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
@@ -752,7 +749,7 @@ function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
-            Show-SystemMessage -title "Removing Registry Entries"
+            Write-SystemMessage -title "Removing Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 $entryDict = @{}
@@ -767,7 +764,7 @@ function Remove-RegistryEntries {
                     $name = $entryDict["Name"]
 
                     Write-Log "Removing registry entry: Path=$path, Name=$name"
-                    Show-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
+                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
 
                     # Use RegistryTouch for removing the registry entry
                     RegistryTouch -action "remove" -path $path -name $name
@@ -780,7 +777,7 @@ function Remove-RegistryEntries {
             Show-SuccessMessage -msg "Registry entries removed successfully."
         } else {
             Write-Log "No registry entries to remove. Missing configuration."
-            Show-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
+            Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
@@ -827,7 +824,7 @@ function Set-WindowsUpdates {
 
         Write-SystemMessage -title "Configuring Windows Updates"
 
-        # Set NoAutoUpdate based on EnableAutoUpdates value
+        # Convert EnableAutoUpdates to its opposite for NoAutoUpdate
         $noAutoUpdate = if ($enableAutoUpdates -eq "TRUE") { "FALSE" } else { "TRUE" }
         
         Write-Log "EnableAutoUpdates: $enableAutoUpdates"
@@ -843,7 +840,6 @@ function Set-WindowsUpdates {
             Write-SystemMessage -msg1 "- Automatic updates disabled." -msg1Color "Green"
         } else {
             Write-Log "Configuring Windows updates..."
-
             RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 0
 
             if ($auOptions -and $scheduledInstallDay -and $scheduledInstallTime) {
@@ -884,8 +880,6 @@ function Set-WindowsUpdates {
 }
 
 
-
-
 # Function to set optional windows features and services
 function Set-Services {
     try {
@@ -918,8 +912,8 @@ function Set-Services {
             Write-Log "Service configurations applied successfully."
             Write-SuccessMessage
         } else {
-            Write-Log "No services to configure. Missing configuration."
-            Write-SystemMessage -msg1 "No services to configure. Missing configuration." -msg1Color "Cyan"
+            Write-Log "No services to configure."
+            Write-SystemMessage -msg1 "No services to configure." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error configuring services: $($_.Exception.Message)"
@@ -1205,56 +1199,83 @@ function Import-Tasks {
 
                 # Check if the key is a folder
                 if ($key -eq "TasksRepository") {
-                    Write-SystemMessage -msg1 "- Downloading all tasks from remote folder: " -msg2 $taskFile
-                    Write-Log "Downloading all tasks from folder: $taskFile"
+                    Write-SystemMessage -msg1 "- Checking remote folder: " -msg2 $taskFile
+                    Write-Log "Checking remote folder: $taskFile"
 
-                    # Download the folder content (assuming it's hosted on GitHub or similar services)
-                    $tempFolder = "$env:TEMP\Tasks"
-                    if (-not (Test-Path $tempFolder)) {
-                        New-Item -ItemType Directory -Path $tempFolder | Out-Null
+                    # Validate if the URL exists
+                    try {
+                        $response = Invoke-WebRequest -Uri $taskFile -Method Head -ErrorAction Stop
+                        if ($response.StatusCode -eq 200) {
+                            Write-Log "Folder exists. Proceeding with download."
+                            Write-SystemMessage -msg1 "- Remote folder exists. Proceeding with download." -msg1Color "Green"
+
+                            # Proceed to download tasks from the folder
+                            $tempFolder = "$env:TEMP\Tasks"
+                            if (-not (Test-Path $tempFolder)) {
+                                New-Item -ItemType Directory -Path $tempFolder | Out-Null
+                            }
+
+                            # Example logic to download and import tasks
+                            $webRequest = Invoke-WebRequest -Uri $taskFile
+                            $xmlFiles = $webRequest.Links | Where-Object { $_.href -match '\.xml$' }
+                            
+                            foreach ($xmlFile in $xmlFiles) {
+                                $fileName = [System.IO.Path]::GetFileName($xmlFile.href)
+                                $fileUrl = "$taskFile$fileName"
+                                $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
+
+                                Write-SystemMessage -msg1 "- Downloading task file: " -msg2 $fileUrl
+                                Write-Log "Downloading task file: $fileUrl"
+                                Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
+
+                                # Import the task
+                                Write-SystemMessage -msg1 "- Importing task: " -msg2 $downloadedFile
+                                Write-Log "Importing task: $downloadedFile"
+                                schtasks /create /tn "$key-$fileName" /xml $downloadedFile /f
+                                Write-SystemMessage -msg1 "- Task $fileName imported successfully." -msg1Color "Green"
+                            }
+                        } else {
+                            throw "Invalid response code $($response.StatusCode)"
+                        }
+                    } catch {
+                        Write-ErrorMessage -msg "The remote folder does not exist or is inaccessible: $taskFile" -colour "Red"
+                        Write-Log "Error: The remote folder does not exist or is inaccessible: $($_.Exception.Message)"
+                        Return
                     }
 
-                    # Download all XML files in the folder
-                    $webRequest = Invoke-WebRequest -Uri $taskFile
-                    $xmlFiles = $webRequest.Links | Where-Object { $_.href -match '\.xml$' }
-                    
-                    foreach ($xmlFile in $xmlFiles) {
-                        $fileName = [System.IO.Path]::GetFileName($xmlFile.href)
-                        $fileUrl = "$taskFile$fileName"
-                        $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
-
-                        Write-SystemMessage -msg1 "- Downloading task file: " -msg2 $fileUrl
-                        Write-Log "Downloading task file: $fileUrl"
-                        Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
-
-                        # Import the task
-                        Write-SystemMessage -msg1 "- Importing task: " -msg2 $downloadedFile
-                        Write-Log "Importing task: $downloadedFile"
-                        schtasks /create /tn "$key-$fileName" /xml $downloadedFile /f
-                        Write-SystemMessage -msg1 "- Task $fileName imported successfully." -msg1Color "Green"
-                    }
                 } else {
                     # Handle individual task files
-                    if ($taskFile -match "^https?://") {
-                        $tempTaskFile = "$env:TEMP\$key.xml"
-                        Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
-                        Write-Log "Downloading task file from: $taskFile"
-                        Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
-                        $taskFile = $tempTaskFile
-                    }
+                    try {
+                        $response = Invoke-WebRequest -Uri $taskFile -Method Head -ErrorAction Stop
+                        if ($response.StatusCode -eq 200) {
+                            Write-Log "File exists. Proceeding with download."
+                            Write-SystemMessage -msg1 "- Task file exists. Proceeding with download." -msg1Color "Green"
+                            $tempTaskFile = "$env:TEMP\$key.xml"
+                            Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
+                            Write-Log "Downloading task file from: $taskFile"
+                            Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
+                            $taskFile = $tempTaskFile
+                        } else {
+                            throw "Invalid response code $($response.StatusCode)"
+                        }
 
-                    # Import the task into Task Scheduler
-                    Write-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
-                    Write-Log "Importing task: $taskFile"
-                    schtasks /create /tn $key /xml $taskFile /f
-                    Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
+                        # Import the task into Task Scheduler
+                        Write-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
+                        Write-Log "Importing task: $taskFile"
+                        schtasks /create /tn $key /xml $taskFile /f
+                        Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
+                    } catch {
+                        Write-ErrorMessage -msg "The task file does not exist or is inaccessible: $taskFile" -colour "Red"
+                        Write-Log "Error: The task file does not exist or is inaccessible: $($_.Exception.Message)"
+                        Return
+                    }
                 }
             }
-            Write-Log "Tasks imported successfully."
+            Write-Log "Scheduled Tasks imported successfully."
             Write-SuccessMessage -msg "Scheduled tasks imported successfully."
         } else {
-            Write-Log "No tasks to import. Missing configuration."
-            Write-SystemMessage -msg1 "No tasks to import. Missing configuration." -msg1Color "Cyan"
+            Write-Log "No scheduled tasks to import. Missing configuration."
+            Write-SystemMessage -msg1 "No Scheduled tasks to import. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)" -colour "Red"
@@ -1262,6 +1283,7 @@ function Import-Tasks {
         Return
     }
 }
+
 
 
 
@@ -1312,6 +1334,7 @@ try {
 }
 
 # Execute functions
+Clear-Host
 Set-SystemCheckpoint
 Set-ComputerName
 Set-Locale
@@ -1335,7 +1358,7 @@ Install-GoogleDrive
 Activate-Windows
 
 # Remove the configuration file if it was downloaded
-if ($configFile -match "$env:TEMP\config.ini") {
+if ($configFile -match "$env:TEMP\\config.ini") {
     Remove-Item -Path $configFile -Force -ErrorAction SilentlyContinue
     Write-Log "Temporary configuration file removed."
 }
