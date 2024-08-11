@@ -23,5 +23,5 @@
 [] Check if Windows Features are already enabled/disabled and skip if config and current state are the same.
 [] Set-ComputerName needs to have a check that checks if the computername is different from the config file.
 Check if Office is already installed and skip if it is.
-
+[] Speed up Invoke-WebRequests downloading for Google Drive etc.
 

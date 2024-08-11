@@ -390,7 +390,8 @@ function Install-Applications {
             
             winget source reset --force
             winget source update
-            
+            Add-AppxPackage -Path "https://cdn.winget.microsoft.com/cache/source.msix"
+
             Write-Log "Winget sources reset and agreements accepted successfully."
             Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
         } catch {
@@ -402,7 +403,7 @@ function Install-Applications {
         try {
             Write-Log "Installing applications from manifest file: $appManifestFile"
             Write-SystemMessage -msg1 "- Installing applications from manifest file"
-            winget import -i $appManifestFile --accept-package-agreements --ignore-versions
+            winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
         } catch {
             Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
             Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
@@ -748,7 +749,7 @@ function Add-RegistryEntries {
                     Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
 
                     # Use RegistryTouch for adding the registry entry
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value | Out-Null
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -791,7 +792,7 @@ function Remove-RegistryEntries {
                     Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
 
                     # Use RegistryTouch for removing the registry entry
-                    RegistryTouch -action "remove" -path $path -name $name
+                    RegistryTouch -action "remove" -path $path -name $name | Out-Null
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -856,26 +857,26 @@ function Set-WindowsUpdates {
         if ($noAutoUpdate -eq "TRUE") {
             Write-Log "Disabling automatic windows updates..."
             Write-SystemMessage -msg1 "- Disabling all automatic updates."
-            RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 1
+            RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 1 | Out-Null
             Write-Log "Automatic updates disabled."
             Write-SystemMessage -msg1 "- Automatic updates disabled." -msg1Color "Green"
         } elseif ($noAutoUpdate -eq "FALSE") {
             Write-Log "Enabling automatic windows updates..."
             Write-SystemMessage -msg1 "- Enabling automatic updates."
-            RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 0
+            RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "NoAutoUpdate" -type "DWord" -value 0 | Out-Null
 
             if ($auOptions -and $scheduledInstallDay -and $scheduledInstallTime) {
                 Write-Log "Setting AUOptions to: $auOptions"
                 Write-SystemMessage -msg1 "- Setting AUOptions to: " -msg2 $auOptions
-                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AUOptions" -type "DWord" -value $auOptions
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AUOptions" -type "DWord" -value $auOptions | Out-Null
 
                 Write-Log "Setting ScheduledInstallDay to: $scheduledInstallDay"
                 Write-SystemMessage -msg1 "- Setting ScheduledInstallDay to: " -msg2 $scheduledInstallDay
-                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "ScheduledInstallDay" -type "DWord" -value $scheduledInstallDay
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "ScheduledInstallDay" -type "DWord" -value $scheduledInstallDay | Out-Null
 
                 Write-Log "Setting ScheduledInstallTime to: $scheduledInstallTime"
                 Write-SystemMessage -msg1 "- Setting ScheduledInstallTime to: " -msg2 $scheduledInstallTime
-                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "ScheduledInstallTime" -type "DWord" -value $scheduledInstallTime
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "ScheduledInstallTime" -type "DWord" -value $scheduledInstallTime | Out-Null
             } else {
                 Write-Log "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings."
                 Write-SystemMessage -msg1 "Missing AUOptions, ScheduledInstallDay, or ScheduledInstallTime configuration. Skipping scheduled updates settings." -msg1Color "Yellow"
@@ -884,11 +885,11 @@ function Set-WindowsUpdates {
             if ($autoInstallMinorUpdates -eq "TRUE") {
                 Write-Log "Enabling AutoInstallMinorUpdates"
                 Write-SystemMessage -msg1 "- Enabling AutoInstallMinorUpdates."
-                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value 1
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value 1 | Out-Null
             } elseif ($autoInstallMinorUpdates -eq "FALSE") {
                 Write-Log "Disabling AutoInstallMinorUpdates"
                 Write-SystemMessage -msg1 "- Disabling AutoInstallMinorUpdates."
-                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value 0
+                RegistryTouch -action "add" -path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -name "AutoInstallMinorUpdates" -type "DWord" -value 0 | Out-Null
             } else {
                 Write-Log "No valid AutoInstallMinorUpdates setting provided."
                 Write-SystemMessage -msg1 "No valid AutoInstallMinorUpdates setting provided." -msg1Color "Yellow"
@@ -969,7 +970,7 @@ function Set-SecuritySettings {
         if ($uacLevel) {
             Write-SystemMessage -msg1 "- Setting UAC level to: " -msg2 $uacLevel
             Write-Log "Setting UAC level to: $uacLevel"
-            RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel
+            RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel | Out-Null
             Write-SystemMessage -msg1 "- UAC level set to $uacLevel." -msg1Color "Green"
         } else {
             Write-ErrorMessage -msg "UAC level not set. Missing configuration."
@@ -996,7 +997,7 @@ function Set-SecuritySettings {
             @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=$telemetryValue; type="DWord"}
         )
         foreach ($key in $telemetryKeys) {
-            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
+            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value | Out-Null
         }
         Write-SystemMessage -msg1 "- Windows Telemetry setting applied." -msg1Color "Green"
         Write-Log "Windows Telemetry setting applied."
@@ -1015,7 +1016,7 @@ function Set-SecuritySettings {
             Write-Log "Invalid value for ShowFileExtensions: $showFileExtensions"
             Return
         }
-        RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $fileExtValue
+        RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $fileExtValue | Out-Null
         Write-SystemMessage -msg1 "- File type extension visibility configured." -msg1Color "Green"
         Write-Log "File type extension visibility configured."
 
@@ -1033,7 +1034,7 @@ function Set-SecuritySettings {
             Write-Log "Invalid value for DisableCopilot: $disableCopilot"
             Return
         }
-        RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value $copilotValue
+        RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value $copilotValue | Out-Null
         Write-SystemMessage -msg1 "- Windows Copilot setting applied." -msg1Color "Green"
         Write-Log "Windows Copilot setting applied."
 
@@ -1056,7 +1057,7 @@ function Set-SecuritySettings {
             @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=$oneDriveValue; type="DWord"}
         )
         foreach ($key in $oneDriveKeys) {
-            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value
+            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value | Out-Null
         }
         if ($disableOneDrive -eq "TRUE") {
             Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
