@@ -729,30 +729,33 @@ function Add-RegistryEntries {
         if ($registrySection) {
             Write-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
-                
-                # Log raw data
-                Write-Log "Raw entry: $($entry[0]), $($entry[1]), $($entry[2]), $($entry[3])"
-                
-                # Parsing data
-                $path = $entry[0].Trim()
-                $name = $entry[1].Trim()
-                $type = $entry[2].Trim()
-                $value = $entry[3].Trim()
+                $rawEntry = $registrySection[$key]
+                Write-Log "Raw entry: $rawEntry"
 
+                $entry = $rawEntry -split ","
                 
-                # Log parsed data
-                Write-Log "Parsed data: Path=$path, Name=$name, Type=$type, Value=$value"
-                
-                # Expand environment variables in the value
-                $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
-                
-                # Log the registry operation
-                Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
-                Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+                # Check if split worked correctly
+                if ($entry.Length -eq 4) {
+                    $path = ($entry[0] -split "=")[1].Trim().Trim('"')
+                    $name = ($entry[1] -split "=")[1].Trim().Trim('"')
+                    $type = ($entry[2] -split "=")[1].Trim().Trim('"')
+                    $value = ($entry[3] -split "=")[1].Trim().Trim('"')
 
-                # Use RegistryTouch for adding the registry entry
-                RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
+                    Write-Log "Parsed data: Path=$path, Name=$name, Type=$type, Value=$value"
+                    
+                    # Expand environment variables in the value
+                    $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
+                    
+                    # Log the registry operation
+                    Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+
+                    # Use RegistryTouch for adding the registry entry
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
+                } else {
+                    Write-Log "Invalid registry entry format: $rawEntry"
+                    Write-ErrorMessage -msg "Invalid registry entry format: $rawEntry"
+                }
             }
             Write-Log "Registry entries added successfully."
             Write-SuccessMessage -msg "Registry entries added successfully."
@@ -765,6 +768,7 @@ function Add-RegistryEntries {
         Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
