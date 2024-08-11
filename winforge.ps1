@@ -725,51 +725,39 @@ function Set-LockScreenImage {
 # Function to add registry entries
 function Add-RegistryEntries {
     try {
-
-        Write-Log "Exhibit 2"
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
             Write-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
-                $rawEntry = $registrySection[$key]
-                Write-Log "Raw entry: $rawEntry"
+                $entry = $registrySection[$key] -split ","
 
-                # Attempt to split the raw entry on commas
-                $entry = $rawEntry -split ","
+                # Log raw entry for debugging
+                Write-Log "Raw entry: $entry"
 
-                # Debugging: Log each element of the split array
-                foreach ($element in $entry) {
-                    Write-Log "Split element: $element"
-                }
-
-                # Validate the split result
                 if ($entry.Length -eq 4) {
-                    $path = ($entry[0] -split "=")[1].Trim().Trim('"')
-                    $name = ($entry[1] -split "=")[1].Trim().Trim('"')
-                    $type = ($entry[2] -split "=")[1].Trim().Trim('"')
-                    $value = ($entry[3] -split "=")[1].Trim().Trim('"')
-                    
+                    $path = ($entry[0] -split "=")[1].Trim('"')
+                    $name = ($entry[1] -split "=")[1].Trim('"')
+                    $type = ($entry[2] -split "=")[1].Trim('"')
+                    $value = ($entry[3] -split "=")[1].Trim('"')
+
                     # Log parsed data
                     Write-Log "Parsed data: Path=$path, Name=$name, Type=$type, Value=$value"
-                    
+
                     # Expand environment variables in the value
                     $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
-
-                    # Log the registry operation
-                    Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
-                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+                    Write-Log "Expanded Value: $expandedValue"
 
                     # Use RegistryTouch for adding the registry entry
                     RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
                 } else {
-                    Write-Log "Invalid registry entry format: $rawEntry"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $rawEntry"
+                    Write-Log "Invalid registry entry format: $key"
+                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries added successfully."
             Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
-            Write-Log "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty."
+            Write-Log "No registry entries to add. Missing configuration."
             Write-SystemMessage -msg1 "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
@@ -777,6 +765,7 @@ function Add-RegistryEntries {
         Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
