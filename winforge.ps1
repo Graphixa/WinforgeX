@@ -735,10 +735,11 @@ function Add-RegistryEntries {
                 Write-Log "Raw entry: $($entry[0]), $($entry[1]), $($entry[2]), $($entry[3])"
                 
                 # Parsing data
-                $path = ($entry[0] -split "=")[1].Trim().Trim('"')
-                $name = ($entry[1] -split "=")[1].Trim().Trim('"')
-                $type = ($entry[2] -split "=")[1].Trim().Trim('"')
-                $value = ($entry[3] -split "=")[1].Trim().Trim('"')
+                $path = $entry[0].Trim()
+                $name = $entry[1].Trim()
+                $type = $entry[2].Trim()
+                $value = $entry[3].Trim()
+
                 
                 # Log parsed data
                 Write-Log "Parsed data: Path=$path, Name=$name, Type=$type, Value=$value"
