@@ -1342,7 +1342,7 @@ function Import-Tasks {
                         $response = Invoke-WebRequest -Uri $taskFile -Method Head -ErrorAction Stop
                         if ($response.StatusCode -eq 200) {
                             Write-Log "File exists. Proceeding with download."
-                            Write-SystemMessage -msg1 "- Task file exists. Proceeding with download." -msg1Color "Green"
+                            Write-SystemMessage -msg1 "- Task file found. Proceeding with download." -msg1Color "Green"
                             $tempTaskFile = "$env:TEMP\$key.xml"
                             Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
                             Write-Log "Downloading task file from: $taskFile"
