@@ -724,7 +724,6 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
-    Write-Host "Test 04a"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
@@ -733,12 +732,23 @@ function Add-RegistryEntries {
 
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
-                # Split the entry into its components
-                $path, $name, $type, $value = $entry.Value -split ","
-                $path = $path.Split("=")[1].Trim('"')
-                $name = $name.Split("=")[1].Trim('"')
-                $type = $type.Split("=")[1].Trim('"')
-                $value = $value.Split("=")[1].Trim('"')
+                # Split the entry into its components using a more controlled approach
+                $components = $entry.Value -split ","
+                
+                $path = $components[0].Split("=")[1].Trim('"').Trim()
+                $name = $components[1].Split("=")[1].Trim('"').Trim()
+                $type = $components[2].Split("=")[1].Trim('"').Trim()
+                $value = $components[3].Split("=")[1].Trim('"').Trim()
+
+                # Debugging: Log each part to check if they're parsed correctly
+                Write-Log "Parsed Entry: Path=$path, Name=$name, Type=$type, Value=$value"
+
+                # Check for null or empty values
+                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
+                    Write-Log "Skipping invalid registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
+                    Write-SystemMessage -msg1 "Skipping invalid registry entry. Missing values." -msg1Color "Yellow"
+                    continue
+                }
 
                 # Log and apply the registry entry
                 Write-SystemMessage -msg1 "- Adding: " -msg2 "$name at $path with type $type and value $value"
@@ -760,6 +770,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
