@@ -739,35 +739,39 @@ function Add-RegistryEntries {
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
                 $value = $entry.Value
 
-                # Function to expand $env: variables manually
-                function Expand-EnvVariables($input) {
-                    return ($input -replace '\$env:([A-Za-z0-9_]+)', {
-                        param($matches)
-                        return Get-Item -Path "Env:\$($matches[1])"
-                    })
+                # Check for $env: in the value and expand it
+                if ($value -match '\$env:([^\\]+)') {
+                    $envVarName = $matches[1]
+                    $envVarValue = [System.Environment]::GetEnvironmentVariable($envVarName)
+                    if ($envVarValue) {
+                        $remainingPath = $value -replace "\${env:$envVarName}", ""
+                        $value = Join-Path -Path $envVarValue -ChildPath $remainingPath
+                    } else {
+                        $errorMessage = "Environment variable $envVarName could not be found. Path=$path, Name=$name, Type=$type, Value=$value"
+                        Write-Log $errorMessage
+                        Write-ErrorMessage -msg $errorMessage
+                        continue
+                    }
                 }
 
-                # Manually expand environment variables in the value
-                $expandedValue = Expand-EnvVariables $value
-
                 # Check for null or empty values and log error, but continue loop
-                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($expandedValue)) {
-                    $errorMessage = "One or more registry entry components are missing or improperly formatted. Please correct your configuration file. Path=$path, Name=$name, Type=$type, Value=$expandedValue"
+                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
+                    $errorMessage = "One or more registry entry components are missing or improperly formatted. Please correct your configuration file. Path=$path, Name=$name, Type=$type, Value=$value"
                     Write-Log $errorMessage
                     Write-ErrorMessage -msg $errorMessage
                     continue  # Skip this entry and continue with the next one
                 }
 
                 # Log and apply the registry entry
-                Write-SystemMessage -msg1 "- Adding registry entry: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
-                Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue"
+                Write-SystemMessage -msg1 "- Adding registry entry: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
+                Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
                 # Use RegistryTouch function to add the registry entry and check for success
                 try {
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value
                 } catch {
-                    Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
-                    Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
+                    Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
+                    Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
                     continue
                 }
             }
@@ -783,6 +787,9 @@ function Add-RegistryEntries {
         Return
     }
 }
+
+
+
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
