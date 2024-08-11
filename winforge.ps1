@@ -742,8 +742,8 @@ function Add-RegistryEntries {
                     Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue"
                     Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
 
-                    # Command to add registry entry
-                    cmd.exe /c "reg add `"$path`" /v `"$name`" /t $type /d `"$expandedValue`" /f"
+                    # Use RegistryTouch for adding the registry entry
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue | Out-Null
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -761,6 +761,8 @@ function Add-RegistryEntries {
     }
 }
 
+
+
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
@@ -776,8 +778,8 @@ function Remove-RegistryEntries {
                     Write-Log "Removing registry entry: Path=$path, Name=$name"
                     Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
 
-                    # Command to remove registry entry
-                    cmd.exe /c "reg delete `"$path`" /v `"$name`" /f"
+                    # Use RegistryTouch for removing the registry entry
+                    RegistryTouch -action "remove" -path $path -name $name | Out-Null
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -794,6 +796,8 @@ function Remove-RegistryEntries {
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
+
+
 
 
 
