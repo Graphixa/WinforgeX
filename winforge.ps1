@@ -739,8 +739,16 @@ function Add-RegistryEntries {
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
                 $value = $entry.Value
 
+                # Function to expand $env: variables manually
+                function Expand-EnvVariables($input) {
+                    return ($input -replace '\$env:([A-Za-z0-9_]+)', {
+                        param($matches)
+                        return Get-Item -Path "Env:\$($matches[1])"
+                    })
+                }
+
                 # Manually expand environment variables in the value
-                $expandedValue = $ExecutionContext.InvokeCommand.ExpandString($value)
+                $expandedValue = Expand-EnvVariables $value
 
                 # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($expandedValue)) {
@@ -775,7 +783,6 @@ function Add-RegistryEntries {
         Return
     }
 }
-
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
