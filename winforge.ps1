@@ -731,10 +731,10 @@ function Add-RegistryEntries {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 4) {
-                    $path = $entry[0].Trim()
-                    $name = $entry[1].Trim()
-                    $type = $entry[2].Trim()
-                    $value = $entry[3].Trim()
+                    $path = $entry[0].Split("=")[1].Trim().Trim('"')
+                    $name = $entry[1].Split("=")[1].Trim().Trim('"')
+                    $type = $entry[2].Split("=")[1].Trim().Trim('"')
+                    $value = $entry[3].Split("=")[1].Trim().Trim('"')
 
                     # Expand environment variables in the value
                     $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
@@ -768,9 +768,9 @@ function Remove-RegistryEntries {
             Write-SystemMessage -title "Removing Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
-                if ($entry.Length -eq 2) {
-                    $path = $entry[0].Trim()
-                    $name = $entry[1].Trim()
+                if ($entry.Length -eq 4) {
+                    $path = $entry[0].Split("=")[1].Trim().Trim('"')
+                    $name = $entry[1].Split("=")[1].Trim().Trim('"')
 
                     Write-Log "Removing registry entry: Path=${path}, Name=${name}"
                     Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=${path}, Name=${name}"
@@ -792,6 +792,7 @@ function Remove-RegistryEntries {
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
