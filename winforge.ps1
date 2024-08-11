@@ -724,6 +724,8 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
+    Write-Host "Test 05"
+    Write-Log "Test 05"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
