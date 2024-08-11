@@ -730,27 +730,36 @@ function Add-RegistryEntries {
             Write-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
+                
+                # Log the raw entry parts for debugging
+                Write-Log "Raw entry parts: $($entry[0]), $($entry[1]), $($entry[2]), $($entry[3])"
+
                 if ($entry.Length -eq 4) {
                     $path = ($entry[0] -split "=")[1].Trim().Trim('"')
                     $name = ($entry[1] -split "=")[1].Trim().Trim('"')
                     $type = ($entry[2] -split "=")[1].Trim().Trim('"')
                     $value = ($entry[3] -split "=")[1].Trim().Trim('"')
-                    Write-Log "Raw entry parts: $($entry[0]), $($entry[1]), $($entry[2]), $($entry[3])"
+
+                    Write-Log "Parsed entry - Path: $path, Name: $name, Type: $type, Value: $value"
 
                     if (-not [string]::IsNullOrEmpty($value)) {
                         Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${value}"
+                        
                         # Expand environment variables in the value
                         $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
-                        RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue | Out-Null
+                        Write-Log "Expanded Value: $expandedValue"
+                        
+                        # Add the registry entry using RegistryTouch
+                        RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
                     } else {
-                        Write-Log "Invalid registry entry format: $key"
-                        Write-ErrorMessage -msg "Invalid registry entry format: $key"
+                        Write-Log "Empty value for registry entry: Path=${path}, Name=${name}, Type=${type}"
+                        Write-ErrorMessage -msg "Empty value for registry entry: Path=${path}, Name=${name}, Type=${type}"
                     }
                 } else {
                     Write-Log "Invalid registry entry format: $key"
+                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
                 }
             }
-            
             Write-Log "Registry entries added successfully."
             Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
@@ -762,6 +771,7 @@ function Add-RegistryEntries {
         Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
