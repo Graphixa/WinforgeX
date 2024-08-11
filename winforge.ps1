@@ -722,83 +722,43 @@ function Set-LockScreenImage {
 }
 
 
-# Function to add registry entries# Function to add registry entries
+# Function to add registry entries
 function Add-RegistryEntries {
     try {
-        Write-Host "Test 2"
-        Write-Log "Test 2"
-        $registryEntries = $config["RegistryAdd"]
-        if ($registryEntries) {
+        # Check if the RegistryAdd section exists in the config
+        if ($config.ContainsKey("RegistryAdd")) {
             Write-SystemMessage -title "Adding Registry Entries"
-            foreach ($entry in $registryEntries.Keys) {
-                $entryParts = $registryEntries[$entry] -split ","
+            $registryEntries = $config["RegistryAdd"]
 
-                # Extract and trim the individual components
-                $path = $entryParts[0].Split("=")[1].Trim().Trim('"')
-                $name = $entryParts[1].Split("=")[1].Trim().Trim('"')
-                $type = $entryParts[2].Split("=")[1].Trim().Trim('"')
-                $value = $entryParts[3].Split("=")[1].Trim().Trim('"')
+            # Loop through each entry in the RegistryAdd section
+            foreach ($entry in $registryEntries.GetEnumerator()) {
+                # Split the entry into its components
+                $path, $name, $type, $value = $entry.Value -split ","
+                $path = $path.Split("=")[1].Trim('"')
+                $name = $name.Split("=")[1].Trim('"')
+                $type = $type.Split("=")[1].Trim('"')
+                $value = $value.Split("=")[1].Trim('"')
 
-                Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
+                # Log and apply the registry entry
+                Write-SystemMessage -msg1 "- Adding: " -msg2 "$name at $path with type $type and value $value"
                 Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
-                # Use RegistryTouch for adding the registry entry
+                # Use RegistryTouch function to add the registry entry
                 RegistryTouch -action "add" -path $path -name $name -type $type -value $value
-                Write-SystemMessage -msg1 "- Registry entry added for $name." -msg1Color "Green"
             }
+
+            Write-SystemMessage -msg1 "Registry entries added successfully." -msg1Color "Green"
             Write-Log "Registry entries added successfully."
-            Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
+            Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Cyan"
             Write-Log "No registry entries to add. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
+        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)" -colour "Red"
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
+        Return
     }
 }
-
-
-
-
-
-
-
-# Function to remove registry entries
-function Remove-RegistryEntries {
-    try {
-        $registrySection = $config["RegistryRemove"]
-        if ($registrySection) {
-            Write-SystemMessage -title "Removing Registry Entries"
-            foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
-                if ($entry.Length -eq 4) { # Use the same structure for consistency
-                    $path = $entry[0].Trim()
-                    $name = $entry[1].Trim()
-
-                    # Log the registry operation
-                    Write-Log "Removing registry entry: Path=${path}, Name=${name}"
-                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=${path}, Name=${name}"
-
-                    # Use RegistryTouch for removing the registry entry
-                    RegistryTouch -action "remove" -path $path -name $name
-                } else {
-                    Write-Log "Invalid registry entry format: $key"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
-                }
-            }
-            Write-Log "Registry entries removed successfully."
-            Write-SuccessMessage -msg "Registry entries removed successfully."
-        } else {
-            Write-Log "No registry entries to remove. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty." -msg1Color "Yellow"
-        }
-    } catch {
-        Write-Log "Error removing registry entries: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
-    }
-}
-
 
 
 # Function to configure power settings
