@@ -732,12 +732,16 @@ function Add-RegistryEntries {
             Write-SystemMessage -title "Adding Registry Entries"
             $registryEntries = $config["RegistryAdd"]
 
+            Write-Log "$registryEntries"
+
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
                 # Split the entry into its components using a more controlled approach
                 $components = $entry.Value -split ","
+
+                Write-Log "$components"
                 
-                $path = $components[0].Split("=")[1].Trim('"').Trim()
+                $path = $components[0].Split("=")
                 $name = $components[1].Split("=")[1].Trim('"').Trim()
                 $type = $components[2].Split("=")[1].Trim('"').Trim()
                 $value = $components[3].Split("=")[1].Trim('"').Trim()
