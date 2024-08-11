@@ -162,11 +162,11 @@ function Write-ErrorMessage {
       $msg = "CRITICAL ERROR",
   
       [Parameter()]
-      $colour = 'Black'
+      $color = 'Black'
     )
   
     Write-Host
-    Write-Host " $msg " -ForegroundColor $colour -BackgroundColor Red
+    Write-Host " $msg " -ForegroundColor $color -BackgroundColor Red
     Write-Host
     Write-Host $_.Exception.Message -ForegroundColor White
     Write-Host
@@ -187,7 +187,6 @@ function Write-SuccessMessage {
   }
 
 
-# Function to add, modify or remove registry settings
 # Function to add, modify, or remove registry settings
 function RegistryTouch {
     param (
@@ -266,7 +265,7 @@ function Set-SystemCheckpoint {
 
     } catch {
         Write-Log "Error creating system restore point: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Failed to create system restore point: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Failed to create system restore point: $($_.Exception.Message)"
         Return
     }
 }
@@ -378,7 +377,7 @@ function Install-Applications {
                 $appManifestFile = $tempAppManifestFile
             } catch {
                 Write-Log "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)" -colour "Red"
+                Write-ErrorMessage -msg "Error downloading app manifest file from: $appManifestFile. Error: $($_.Exception.Message)"
                 Return
             }
 
@@ -397,7 +396,7 @@ function Install-Applications {
             Write-SystemMessage -msg1 "- Winget sources reset and agreements accepted successfully." -msg1Color "Green"
         } catch {
             Write-Log "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)" -colour "Red"
+            Write-ErrorMessage -msg "Error resetting Winget sources or accepting agreements: $($_.Exception.Message)"
             Return
         }
 
@@ -407,7 +406,7 @@ function Install-Applications {
             winget import -i $appManifestFile --accept-package-agreements --ignore-versions --accept-source-agreements
         } catch {
             Write-Log "Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)" -colour "Red"
+            Write-ErrorMessage -msg "- Error installing applications from manifest file ${appManifestFile}: $($_.Exception.Message)"
             Return
         }
 
@@ -525,7 +524,7 @@ function Install-Fonts {
         }
     } catch {
         Write-Log "Error installing fonts: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error installing fonts: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Error installing fonts: $($_.Exception.Message)"
         Return
     }
 }
@@ -726,53 +725,46 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
-    Write-Host "Test 9"
-    Write-Log "Test 9"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
             Write-SystemMessage -title "Adding Registry Entries"
             $registryEntries = $config["RegistryAdd"]
 
-            # Log the retrieved RegistryAdd section
-            Write-Log "RegistryAdd Section: $($registryEntries | Out-String)"
-
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
-                Write-Log "Processing Entry: $($entry | Out-String)"
-
-                # Split the entry using the "=" delimiter directly on the $entry.Key
-                $entryString = $entry.Key
-                $entryValue = $entry.Value
-
-                # Extract components manually using split and array access
+                # Initialize variables
                 $path = $null
                 $name = $null
                 $type = $null
-                $value = $entryValue  # Directly assign the entry's Value
+                $value = $null
 
                 # Extract key parts from $entryString
-                if ($entryString -match 'Path="([^"]+)"') { $path = $matches[1] }
-                if ($entryString -match 'Name="([^"]+)"') { $name = $matches[1] }
-                if ($entryString -match 'Type="([^"]+)"') { $type = $matches[1] }
-                if ($entryString -match 'Value="([^"]+)"') { $value = $matches[1] }
+                $path = if ($entry.Key -match 'Path="([^"]+)"') { $matches[1] } else { $null }
+                $name = if ($entry.Key -match 'Name="([^"]+)"') { $matches[1] } else { $null }
+                $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
+                $value = if ($entry.Key -match 'Value="([^"]+)"') { $matches[1] } else { $null }
 
-                # Debugging: Log each extracted part to check if they're parsed correctly
-                Write-Log "Parsed Entry: Path=$path, Name=$name, Type=$type, Value=$value"
-
-                # Check for null or empty values
+                # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
-                    Write-Log "Skipping invalid registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
-                    Write-SystemMessage -msg1 "Skipping invalid registry entry. Missing values." -msg1Color "Yellow"
-                    continue
+                    $errorMessage = "One or more registry entry components are missing or improperly formatted. Please correct your configuration file. Path=$path, Name=$name, Type=$type, Value=$value"
+                    Write-Log $errorMessage
+                    Write-ErrorMessage -msg $errorMessage
+                    continue  # Skip this entry and continue with the next one
                 }
 
                 # Log and apply the registry entry
                 Write-SystemMessage -msg1 "- Adding: " -msg2 "$name at $path with type $type and value $value"
                 Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
-                # Use RegistryTouch function to add the registry entry
-                RegistryTouch -action "add" -path $path -name $name -type $type -value $value
+                # Use RegistryTouch function to add the registry entry and check for success
+                try {
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value
+                } catch {
+                    Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
+                    Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
+                    continue
+                }
             }
 
             Write-SystemMessage -msg1 "Registry entries added successfully." -msg1Color "Green"
@@ -782,17 +774,68 @@ function Add-RegistryEntries {
             Write-Log "No registry entries to add. Missing configuration."
         }
     } catch {
-        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
         Return
     }
 }
 
+# Function to remove registry entries
+function Remove-RegistryEntries {
+    try {
+        # Check if the RegistryRemove section exists in the config
+        if ($config.ContainsKey("RegistryRemove")) {
+            Write-SystemMessage -title "Removing Registry Entries"
+            $registryEntries = $config["RegistryRemove"]
 
+            # Loop through each entry in the RegistryRemove section
+            foreach ($entry in $registryEntries.GetEnumerator()) {
+                # Initialize variables
+                $path = $null
+                $name = $null
+                $type = $null
+                $value = $null
 
+                # Extract key parts from $entryString
+                $path = if ($entry.Key -match 'Path="([^"]+)"') { $matches[1] } else { $null }
+                $name = if ($entry.Key -match 'Name="([^"]+)"') { $matches[1] } else { $null }
+                $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
+                $value = if ($entry.Key -match 'Value="([^"]+)"') { $matches[1] } else { $null }
 
+                # Check for null or empty values and log error, but continue loop
+                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
+                    $errorMessage = "One or more registry entry components are missing or improperly formatted. Please correct your configuration file. Path=$path, Name=$name, Type=$type, Value=$value"
+                    Write-Log $errorMessage
+                    Write-ErrorMessage -msg $errorMessage
+                    continue  # Skip this entry and continue with the next one
+                }
 
+                # Log and attempt to remove the registry entry
+                Write-SystemMessage -msg1 "- Removing: " -msg2 "$name at $path"
+                Write-Log "Removing registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
+                # Use RegistryTouch function to remove the registry entry and check for success
+                try {
+                    RegistryTouch -action "remove" -path $path -name $name
+                } catch {
+                    Write-ErrorMessage -msg "Failed to remove registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
+                    Write-Log "Failed to remove registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
+                    continue
+                }
+            }
+
+            Write-SystemMessage -msg1 "Registry entries removed successfully." -msg1Color "Green"
+            Write-Log "Registry entries removed successfully."
+        } else {
+            Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Cyan"
+            Write-Log "No registry entries to remove. Missing configuration."
+        }
+    } catch {
+        Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
+        Write-Log "Error removing registry entries: $($_.Exception.Message)"
+        Return
+    }
+}
 
 
 # Function to configure power settings
@@ -927,7 +970,7 @@ function Set-Services {
                             Write-SystemMessage -msg1 "$serviceName is already disabled. Skipping." -msg1Color "Cyan"
                         }
                     } else {
-                        Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg2Color "Red"
+                        Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg1Color "Red"
                         Write-Log "Invalid service action for ${serviceName}: $serviceAction"
                     }
                 } catch {
@@ -943,7 +986,7 @@ function Set-Services {
         }
     } catch {
         Write-Log "Error configuring services: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error configuring services: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Error configuring services: $($_.Exception.Message)"
         Return
     }
 }
@@ -1063,7 +1106,7 @@ function Set-SecuritySettings {
 
         Write-SuccessMessage -msg "Security settings configured successfully."
     } catch {
-        Write-ErrorMessage -msg "Error configuring security settings: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Error configuring security settings: $($_.Exception.Message)"
         Write-Log "Error configuring security settings: $($_.Exception.Message)"
         Return
     }
@@ -1128,7 +1171,7 @@ function Install-ChromeEnterprise {
                 Write-Log "Chrome Enterprise installed."
             }
             else {
-                Write-SystemMessage -msg1 "- Failed to install Google Chrome Enterprise. Exit code: $($installProcess.ExitCode)" -msg1Color "Red"
+                Write-ErrorMessage -msg "Failed to install Google Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
                 Write-Log "Failed to install Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
             }
         }
@@ -1195,7 +1238,7 @@ function Install-GCPW {
                         Write-Log 'Domains have been set'
                     }
                 } else {
-                    Write-ErrorMessage -msg "- Failed to install Google Credential Provider for Windows (GCPW). Exit code: $($installProcess.ExitCode)" -colour "Red"
+                    Write-ErrorMessage -msg "- Failed to install Google Credential Provider for Windows (GCPW). Exit code: $($installProcess.ExitCode)"
                     Write-Log "Failed to install GCPW. Exit code: $($installProcess.ExitCode)"
                 }
             } finally {
@@ -1295,7 +1338,7 @@ function Import-Tasks {
                             throw "Invalid response code $($response.StatusCode)"
                         }
                     } catch {
-                        Write-ErrorMessage -msg "The remote folder does not exist or is inaccessible: $taskFile" -colour "Red"
+                        Write-ErrorMessage -msg "The remote folder does not exist or is inaccessible: $taskFile"
                         Write-Log "Error: The remote folder does not exist or is inaccessible: $($_.Exception.Message)"
                         Return
                     }
@@ -1322,7 +1365,7 @@ function Import-Tasks {
                         schtasks /create /tn $key /xml $taskFile /f
                         Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
                     } catch {
-                        Write-ErrorMessage -msg "The task file does not exist or is inaccessible: $taskFile" -colour "Red"
+                        Write-ErrorMessage -msg "The task file does not exist or is inaccessible: $taskFile"
                         Write-Log "Error: The task file does not exist or is inaccessible: $($_.Exception.Message)"
                         Return
                     }
@@ -1335,7 +1378,7 @@ function Import-Tasks {
             Write-SystemMessage -msg1 "No Scheduled tasks to import. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
-        Write-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)"
         Write-Log "Error importing tasks: $($_.Exception.Message)"
         Return
     }
@@ -1362,7 +1405,7 @@ function Activate-Windows {
             Write-SystemMessage -msg1 "Windows activation not performed. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
-        Write-ErrorMessage -msg "Error activating Windows: $($_.Exception.Message)" -colour "Red"
+        Write-ErrorMessage -msg "Error activating Windows: $($_.Exception.Message)"
         Write-Log "Error activating Windows: $($_.Exception.Message)"
         Return
     }
