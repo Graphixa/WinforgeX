@@ -385,11 +385,10 @@ function Install-Applications {
 
         try {
             # Reset Winget sources and accept agreements
-            Write-Log "Resetting Winget sources and accepting agreements."
-            Write-SystemMessage -msg1 "- Resetting Winget sources and accepting agreements."
+            Write-Log "Resetting Winget sources."
+            Write-SystemMessage -msg1 "- Resetting Winget sources."
             
             winget source reset --force
-            winget source update
             Add-AppxPackage -Path "https://cdn.winget.microsoft.com/cache/source.msix"
 
             Write-Log "Winget sources reset and agreements accepted successfully."
@@ -735,7 +734,12 @@ function Add-RegistryEntries {
                 $entryDict = @{}
                 foreach ($item in $entry) {
                     $keyValue = $item.Trim() -split "="
-                    $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
+                    if ($keyValue.Count -eq 2) {
+                        $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
+                    } else {
+                        Write-Log "Invalid key-value pair: $item"
+                        Write-ErrorMessage -msg "Invalid key-value pair: $item"
+                    }
                 }
 
                 # Ensure all required fields are present
@@ -751,15 +755,15 @@ function Add-RegistryEntries {
                     # Use RegistryTouch for adding the registry entry
                     RegistryTouch -action "add" -path $path -name $name -type $type -value $value | Out-Null
                 } else {
-                    Write-Log "Invalid registry entry format: $key"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Write-Log "Missing required registry entry fields for: $key"
+                    Write-ErrorMessage -msg "Missing required registry entry fields for: $key"
                 }
             }
             Write-Log "Registry entries added successfully."
             Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
-            Write-Log "No registry entries to add. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
+            Write-Log "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty."
+            Write-SystemMessage -msg1 "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
@@ -780,7 +784,12 @@ function Remove-RegistryEntries {
                 $entryDict = @{}
                 foreach ($item in $entry) {
                     $keyValue = $item.Trim() -split "="
-                    $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
+                    if ($keyValue.Count -eq 2) {
+                        $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
+                    } else {
+                        Write-Log "Invalid key-value pair: $item"
+                        Write-ErrorMessage -msg "Invalid key-value pair: $item"
+                    }
                 }
 
                 # Ensure all required fields are present
@@ -794,15 +803,15 @@ function Remove-RegistryEntries {
                     # Use RegistryTouch for removing the registry entry
                     RegistryTouch -action "remove" -path $path -name $name | Out-Null
                 } else {
-                    Write-Log "Invalid registry entry format: $key"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Write-Log "Missing required registry entry fields for: $key"
+                    Write-ErrorMessage -msg "Missing required registry entry fields for: $key"
                 }
             }
             Write-Log "Registry entries removed successfully."
             Write-SuccessMessage -msg "Registry entries removed successfully."
         } else {
-            Write-Log "No registry entries to remove. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
+            Write-Log "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty."
+            Write-SystemMessage -msg1 "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
@@ -920,16 +929,29 @@ function Set-Services {
                 $serviceName = $service.Key
                 $serviceAction = $service.Value.ToLower()
                 try {
+                    # Check if the feature is installed or not
+                    $featureStatus = Get-WindowsOptionalFeature -Online -FeatureName $serviceName
+
                     if ($serviceAction -eq "enabled") {
-                        Write-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
-                        Write-Log "Enabling service: $serviceName"
-                        Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
-                        Write-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
+                        if ($featureStatus.State -eq "Disabled") {
+                            Write-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
+                            Write-Log "Enabling service: $serviceName"
+                            Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
+                            Write-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
+                        } else {
+                            Write-Log "$serviceName is already enabled. Skipping."
+                            Write-SystemMessage -msg1 "$serviceName is already enabled. Skipping." -msg1Color "Cyan"
+                        }
                     } elseif ($serviceAction -eq "disabled") {
-                        Write-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
-                        Write-Log "Disabling service: $serviceName"
-                        Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
-                        Write-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
+                        if ($featureStatus.State -eq "Enabled") {
+                            Write-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
+                            Write-Log "Disabling service: $serviceName"
+                            Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
+                            Write-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
+                        } else {
+                            Write-Log "$serviceName is already disabled. Skipping."
+                            Write-SystemMessage -msg1 "$serviceName is already disabled. Skipping." -msg1Color "Cyan"
+                        }
                     } else {
                         Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg2Color "Red"
                         Write-Log "Invalid service action for ${serviceName}: $serviceAction"
