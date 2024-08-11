@@ -724,7 +724,8 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
-    Write-Log "Archival 01"
+    Write-Log "Test 02"
+    Write-Host "Test 02"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
@@ -733,12 +734,11 @@ function Add-RegistryEntries {
 
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
-                # Split the entry into its components
-                $path, $name, $type, $value = $entry.Value -split ","
-                $path = $path -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
-                $name = $name -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
-                $type = $type -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
-                $value = $value -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
+                # Use regex to match and capture each key-value pair in the entry
+                $path = if ($entry.Value -match 'Path="([^"]*)"') { $matches[1] } else { $null }
+                $name = if ($entry.Value -match 'Name="([^"]*)"') { $matches[1] } else { $null }
+                $type = if ($entry.Value -match 'Type="([^"]*)"') { $matches[1] } else { $null }
+                $value = if ($entry.Value -match 'Value="([^"]*)"') { $matches[1] } else { $null }
 
                 # Check for null or empty values
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
@@ -767,6 +767,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
