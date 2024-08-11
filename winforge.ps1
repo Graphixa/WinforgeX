@@ -728,36 +728,41 @@ function Add-RegistryEntries {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
             Write-SystemMessage -title "Adding Registry Entries"
-            foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
+            foreach ($entry in $registrySection.Keys) {
+                # Extract the individual components from the entry
+                $entryData = $registrySection[$entry] -split ","
                 
-                # Log the raw entry parts for debugging
-                Write-Log "Raw entry parts: $($entry[0]), $($entry[1]), $($entry[2]), $($entry[3])"
-
-                if ($entry.Length -eq 4) {
-                    $path = ($entry[0] -split "=")[1].Trim().Trim('"')
-                    $name = ($entry[1] -split "=")[1].Trim().Trim('"')
-                    $type = ($entry[2] -split "=")[1].Trim().Trim('"')
-                    $value = ($entry[3] -split "=")[1].Trim().Trim('"')
-
-                    Write-Log "Parsed entry - Path: $path, Name: $name, Type: $type, Value: $value"
-
-                    if (-not [string]::IsNullOrEmpty($value)) {
-                        Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${value}"
-                        
-                        # Expand environment variables in the value
-                        $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
-                        Write-Log "Expanded Value: $expandedValue"
-                        
-                        # Add the registry entry using RegistryTouch
-                        RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
+                # Initialize a hashtable to store the parsed components
+                $entryDict = @{}
+                
+                # Iterate over each component and extract key-value pairs
+                foreach ($item in $entryData) {
+                    $pair = $item.Trim() -split "="
+                    if ($pair.Length -eq 2) {
+                        $entryDict[$pair[0].Trim()] = $pair[1].Trim().Trim('"')
                     } else {
-                        Write-Log "Empty value for registry entry: Path=${path}, Name=${name}, Type=${type}"
-                        Write-ErrorMessage -msg "Empty value for registry entry: Path=${path}, Name=${name}, Type=${type}"
+                        Write-Log "Invalid key-value pair: $item"
+                        Write-ErrorMessage -msg "Invalid key-value pair: $item"
                     }
+                }
+
+                # Ensure all required fields are present
+                if ($entryDict.ContainsKey("Path") -and $entryDict.ContainsKey("Name") -and $entryDict.ContainsKey("Type") -and $entryDict.ContainsKey("Value")) {
+                    $path = $entryDict["Path"]
+                    $name = $entryDict["Name"]
+                    $type = $entryDict["Type"]
+                    $value = $entryDict["Value"]
+
+                    Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${value}"
+
+                    # Expand environment variables in the value
+                    $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
+
+                    # Add the registry entry using RegistryTouch
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
                 } else {
-                    Write-Log "Invalid registry entry format: $key"
-                    Write-ErrorMessage -msg "Invalid registry entry format: $key"
+                    Write-Log "Missing required registry entry fields for: $entry"
+                    Write-ErrorMessage -msg "Missing required registry entry fields for: $entry"
                 }
             }
             Write-Log "Registry entries added successfully."
@@ -771,6 +776,7 @@ function Add-RegistryEntries {
         Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
