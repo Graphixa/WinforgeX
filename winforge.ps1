@@ -733,17 +733,11 @@ function Add-RegistryEntries {
 
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
-                # Initialize variables
-                $path = $null
-                $name = $null
-                $type = $null
-                $value = $null
-
                 # Extract key parts from $entryString
                 $path = if ($entry.Key -match 'Path="([^"]+)"') { $matches[1] } else { $null }
                 $name = if ($entry.Key -match 'Name="([^"]+)"') { $matches[1] } else { $null }
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
-                $value = if ($entry.Key -match 'Value="([^"]+)"') { $matches[1] } else { $null }
+                $value = $entry.Value
 
                 # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
@@ -790,17 +784,11 @@ function Remove-RegistryEntries {
 
             # Loop through each entry in the RegistryRemove section
             foreach ($entry in $registryEntries.GetEnumerator()) {
-                # Initialize variables
-                $path = $null
-                $name = $null
-                $type = $null
-                $value = $null
-
                 # Extract key parts from $entryString
                 $path = if ($entry.Key -match 'Path="([^"]+)"') { $matches[1] } else { $null }
                 $name = if ($entry.Key -match 'Name="([^"]+)"') { $matches[1] } else { $null }
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
-                $value = if ($entry.Key -match 'Value="([^"]+)"') { $matches[1] } else { $null }
+                $value = $entry.Value
 
                 # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
@@ -836,6 +824,7 @@ function Remove-RegistryEntries {
         Return
     }
 }
+
 
 
 # Function to configure power settings
