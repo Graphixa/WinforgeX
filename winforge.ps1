@@ -724,8 +724,8 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
-    Write-Host "Test 8"
-    Write-Log "Test 8"
+    Write-Host "Test 9"
+    Write-Log "Test 9"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
@@ -739,14 +739,21 @@ function Add-RegistryEntries {
             foreach ($entry in $registryEntries.GetEnumerator()) {
                 Write-Log "Processing Entry: $($entry | Out-String)"
 
-                # Extract the entire entry as a single string
+                # Split the entry using the "=" delimiter directly on the $entry.Key
                 $entryString = $entry.Key
+                $entryValue = $entry.Value
 
-                # Extract components using regex to handle the entire line properly
-                $path = if ($entryString -match 'Path="([^"]+)"') { $matches[1] } else { $null }
-                $name = if ($entryString -match 'Name="([^"]+)"') { $matches[1] } else { $null }
-                $type = if ($entryString -match 'Type="([^"]+)"') { $matches[1] } else { $null }
-                $value = if ($entryString -match 'Value="([^"]+)"') { $matches[1] } else { $null }
+                # Extract components manually using split and array access
+                $path = $null
+                $name = $null
+                $type = $null
+                $value = $entryValue  # Directly assign the entry's Value
+
+                # Extract key parts from $entryString
+                if ($entryString -match 'Path="([^"]+)"') { $path = $matches[1] }
+                if ($entryString -match 'Name="([^"]+)"') { $name = $matches[1] }
+                if ($entryString -match 'Type="([^"]+)"') { $type = $matches[1] }
+                if ($entryString -match 'Value="([^"]+)"') { $value = $matches[1] }
 
                 # Debugging: Log each extracted part to check if they're parsed correctly
                 Write-Log "Parsed Entry: Path=$path, Name=$name, Type=$type, Value=$value"
@@ -778,6 +785,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
