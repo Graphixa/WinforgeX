@@ -739,7 +739,7 @@ function Add-RegistryEntries {
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
                 $value = $entry.Value
 
-                # Expand environment variables in the $value string
+                # Expand any environment variables in the value
                 $expandedValue = [Environment]::ExpandEnvironmentVariables($value)
 
                 # Check for null or empty values and log error, but continue loop
