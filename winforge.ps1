@@ -748,7 +748,7 @@ function Add-RegistryEntries {
                 }
 
                 # Log and apply the registry entry
-                Write-SystemMessage -msg1 "- Adding: " -msg2 "$name at $path with type $type and value $value"
+                Write-SystemMessage -msg1 "- Adding registry entry: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
                 Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
                 # Use RegistryTouch function to add the registry entry and check for success
@@ -761,8 +761,7 @@ function Add-RegistryEntries {
                 }
             }
 
-            Write-SystemMessage -msg1 "Registry entries added successfully." -msg1Color "Green"
-            Write-Log "Registry entries added successfully."
+            Write-Log "Add Registry entries complete."
         } else {
             Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Cyan"
             Write-Log "No registry entries to add. Missing configuration."
@@ -799,7 +798,7 @@ function Remove-RegistryEntries {
                 }
 
                 # Log and attempt to remove the registry entry
-                Write-SystemMessage -msg1 "- Removing: " -msg2 "$name at $path"
+                Write-SystemMessage -msg1 "- Removing registry entry: " -msg2 "Path=$path, Name=$name"
                 Write-Log "Removing registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
                 # Use RegistryTouch function to remove the registry entry and check for success
@@ -812,8 +811,7 @@ function Remove-RegistryEntries {
                 }
             }
 
-            Write-SystemMessage -msg1 "Registry entries removed successfully." -msg1Color "Green"
-            Write-Log "Registry entries removed successfully."
+                Write-Log "Remove Registry entries complete."
         } else {
             Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Cyan"
             Write-Log "No registry entries to remove. Missing configuration."
