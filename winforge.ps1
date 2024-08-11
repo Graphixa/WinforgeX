@@ -188,6 +188,7 @@ function Write-SuccessMessage {
 
 
 # Function to add, modify or remove registry settings
+# Function to add, modify, or remove registry settings
 function RegistryTouch {
     param (
         [Parameter(Mandatory=$true)]
@@ -213,19 +214,19 @@ function RegistryTouch {
             # Check if the registry path exists, if not create it
             if (-not (Test-Path $path)) {
                 Write-Log "Registry path does not exist. Creating path: $path"
-                New-Item -Path $path -Force
+                New-Item -Path $path -Force -ErrorAction Stop
             }
 
             # Check if the registry item exists
             if (-not (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue)) {
                 Write-Log "Registry item does not exist. Creating item: $name with value: $value"
-                New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force
+                New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force -ErrorAction Stop
             } else {
                 # Check if the existing value is different
                 $currentValue = (Get-ItemProperty -Path $path -Name $name).$name
                 if ($currentValue -ne $value) {
                     Write-Log "Registry value differs. Updating item: $name from $currentValue to $value"
-                    Set-ItemProperty -Path $path -Name $name -Value $value -Force
+                    Set-ItemProperty -Path $path -Name $name -Value $value -Force -ErrorAction Stop
                 } else {
                     Write-Log "Registry item: $name with value: $value already exists. Skipping."
                 }
@@ -234,7 +235,7 @@ function RegistryTouch {
             # Check if the registry name exists
             if (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue) {
                 Write-Log "Removing registry item: $name from path: $path"
-                Remove-ItemProperty -Path $path -Name $name -Force
+                Remove-ItemProperty -Path $path -Name $name -Force -ErrorAction Stop
             } else {
                 Write-Log "Registry item: $name does not exist at path: $path. Skipping."
             }
@@ -244,6 +245,7 @@ function RegistryTouch {
         Write-ErrorMessage -msg "Error in Modifying the Registry: $($_.Exception.Message)"
     }
 }
+
 
 function Set-SystemCheckpoint {
     $date = Get-Date -Format "dd/MM/yyyy"
