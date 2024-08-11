@@ -729,26 +729,21 @@ function Add-RegistryEntries {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
             Write-SystemMessage -title "Adding Registry Entries"
-            foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -replace 'KeyName=', '' -replace ', Value=', ',' -replace ', Type=', ',' -replace ', Data=', ',' -replace '"', ''
-                $entryArray = $entry -split ','
+            foreach ($entry in $registrySection) {
+                $entryParts = $entry.Split(",").Trim()
+                $path = $entryParts[0].Split("=")[1].Trim().Trim('"')
+                $name = $entryParts[1].Split("=")[1].Trim().Trim('"')
+                $type = $entryParts[2].Split("=")[1].Trim().Trim('"')
+                $value = $entryParts[3].Split("=")[1].Trim().Trim('"')
 
-                # Ensure all required fields are present
-                if ($entryArray.Length -eq 4) {
-                    $path = $entryArray[0].Trim()
-                    $name = $entryArray[1].Trim()
-                    $type = $entryArray[2].Trim()
-                    $value = $entryArray[3].Trim()
+                # Expand environment variables in the value if present
+                $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
 
-                    Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Data=$value"
-                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Data=$value"
+                Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue"
+                Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
 
-                    # Use RegistryTouch for adding the registry entry
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value | Out-Null
-                } else {
-                    Write-Log "Missing required registry entry fields for: $key"
-                    Write-ErrorMessage -msg "Missing required registry entry fields for: $key"
-                }
+                # Use RegistryTouch for adding the registry entry
+                RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue | Out-Null
             }
             Write-Log "Registry entries added successfully."
             Write-SuccessMessage -msg "Registry entries added successfully."
@@ -765,30 +760,28 @@ function Add-RegistryEntries {
 
 
 
+
+
+
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
             Write-SystemMessage -title "Removing Registry Entries"
-            foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -replace 'KeyName=', '' -replace ', Value=', ',' -replace ', Type=', ',' -replace ', Data=', ',' -replace '"', ''
-                $entryArray = $entry -split ','
+            foreach ($entry in $registrySection) {
+                $entryParts = $entry.Split(",").Trim()
+                $path = $entryParts[0].Split("=")[1].Trim().Trim('"')
+                $name = $entryParts[1].Split("=")[1].Trim().Trim('"')
 
-                # Ensure all required fields are present
-                if ($entryArray.Length -eq 4) {
-                    $path = $entryArray[0].Trim()
-                    $name = $entryArray[1].Trim()
+                # Expand environment variables in the name if present
+                $expandedName = [System.Environment]::ExpandEnvironmentVariables($name)
 
-                    Write-Log "Removing registry entry: Path=$path, Name=$name"
-                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
+                Write-Log "Removing registry entry: Path=$path, Name=$expandedName"
+                Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$expandedName"
 
-                    # Use RegistryTouch for removing the registry entry
-                    RegistryTouch -action "remove" -path $path -name $name | Out-Null
-                } else {
-                    Write-Log "Missing required registry entry fields for: $key"
-                    Write-ErrorMessage -msg "Missing required registry entry fields for: $key"
-                }
+                # Use RegistryTouch for removing the registry entry
+                RegistryTouch -action "remove" -path $path -name $expandedName | Out-Null
             }
             Write-Log "Registry entries removed successfully."
             Write-SuccessMessage -msg "Registry entries removed successfully."
@@ -801,6 +794,9 @@ function Remove-RegistryEntries {
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
+
+
+
 
 
 
