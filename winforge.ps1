@@ -1423,6 +1423,6 @@ if ($configFile -match [regex]::Escape("$env:TEMP\config.ini")) {
     Write-Log "Temporary configuration file removed."
 }
 
-
+$ProgressPreference = 'Continue'
 Write-Log "System configuration completed successfully."
 Write-SystemMessage "System configuration completed successfully."
