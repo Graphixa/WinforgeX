@@ -753,7 +753,7 @@ function Add-RegistryEntries {
 
                 # Use RegistryTouch function to add the registry entry and check for success
                 try {
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value | Out-Null
                 } catch {
                     Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
                     Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
@@ -803,7 +803,7 @@ function Remove-RegistryEntries {
 
                 # Use RegistryTouch function to remove the registry entry and check for success
                 try {
-                    RegistryTouch -action "remove" -path $path -name $name
+                    RegistryTouch -action "remove" -path $path -name $name | Out-Null
                 } catch {
                     Write-ErrorMessage -msg "Failed to remove registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
                     Write-Log "Failed to remove registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
