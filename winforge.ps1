@@ -739,20 +739,8 @@ function Add-RegistryEntries {
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
                 $value = $entry.Value
 
-                # Check for $env: in the value and expand it
-                if ($value -match '\$env:([^\\]+)') {
-                    $envVarName = $matches[1]
-                    $envVarValue = [System.Environment]::GetEnvironmentVariable($envVarName)
-                    if ($envVarValue) {
-                        $remainingPath = $value -replace "\${env:$envVarName}", ""
-                        $value = Join-Path -Path $envVarValue -ChildPath $remainingPath
-                    } else {
-                        $errorMessage = "Environment variable $envVarName could not be found. Path=$path, Name=$name, Type=$type, Value=$value"
-                        Write-Log $errorMessage
-                        Write-ErrorMessage -msg $errorMessage
-                        continue
-                    }
-                }
+                # Expand any environment variables in $value
+                $value = [System.Environment]::ExpandEnvironmentVariables($value)
 
                 # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
@@ -787,6 +775,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
