@@ -736,6 +736,9 @@ function Add-RegistryEntries {
                     $type = $entry[2].Trim()
                     $value = $entry[3].Trim()
 
+
+                    Write-Host "$path, $name, $type, $value"
+                    Write-Log "Testing keys $path, $name, $type, $value."
                     # Log the registry operation
                     Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${value}"
                     Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=${path}, Name=${name}, Type=${type}, Value=${value}"
