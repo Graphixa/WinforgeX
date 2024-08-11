@@ -740,10 +740,7 @@ function Add-RegistryEntries {
                 $value = $entry.Value
 
                 # Manually expand $env: variables in the $value string
-                $expandedValue = $value -replace '\$env:([a-zA-Z_][a-zA-Z0-9_]*)', {
-                    param($matches)
-                    return (Get-Item "env:$($matches[1])").Value
-                }
+                $expandedValue = $value -replace '\$env:([a-zA-Z_][a-zA-Z0-9_]*)', { param($matches) return $ExecutionContext.InvokeCommand.ExpandString($matches[0]) }
 
                 # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($expandedValue)) {
@@ -778,6 +775,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
