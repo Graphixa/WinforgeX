@@ -30,7 +30,7 @@ param (
 $logFile = Join-Path -Path $env:SYSTEMDRIVE -ChildPath "winforge-configuration.log"
 $config = @{}
 
-
+$ProgressPreference = 'SilentlyContinue'
 
 # Function to check if the current user is an admin
 function Test-IsAdmin {
@@ -1127,45 +1127,40 @@ function Set-EnvironmentVariables {
 
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
-    $installChrome = Get-ConfigValue -section "Google" -key "InstallGoogleChrome"
+    $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
+        'googlechromestandaloneenterprise64.msi'
+    }
+    else {
+        'googlechromestandaloneenterprise.msi'
+    }
 
-    if ($installChrome -eq "TRUE") {
-        Write-SystemMessage -title "Installing Google Chrome Enterprise"
-        $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
-            'googlechromestandaloneenterprise64.msi'
-        } else {
-            'googlechromestandaloneenterprise.msi'
-        }
+    $chromeUrl = "https://dl.google.com/chrome/install/$chromeFileName"
+    
+    if (Test-ProgramInstalled 'Google Chrome') {
+        Write-SystemMessage -msg1 "- Google Chrome Enterprise is already installed. Skipping installation." -msg1Color "Cyan"
+        Write-Log "Google Chrome Enterprise already installed. Skipping..."
+    } 
+    else {
+        Write-SystemMessage -msg1 "- Downloading: " -msg2 "Google Chrome Enterprise"
+        Write-Log "Downloading Chrome from $chromeUrl"
+        Invoke-WebRequest -Uri $chromeUrl -OutFile "$env:TEMP\$chromeFileName" | Out-Null
 
-        $chromeUrl = "https://dl.google.com/chrome/install/$chromeFileName"
+        try {
+            $arguments = "/i `"$env:TEMP\$chromeFileName`" /qn"
+            $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
 
-        if (Test-ProgramInstalled 'Google Chrome') {
-            Write-SystemMessage -msg1 "- Google Chrome Enterprise is already installed. Skipping installation." -msg1Color "Cyan"
-            Write-Log "Google Chrome Enterprise already installed. Skipping..."
-        } else {
-            Write-SystemMessage -msg1 "- Downloading: " -msg2 "Google Chrome Enterprise"
-            Write-Log "Downloading Chrome from $chromeUrl"
-            Invoke-WebRequest -Uri $chromeUrl -OutFile "$env:TEMP\$chromeFileName"
-
-            try {
-                $arguments = "/i `"$env:TEMP\$chromeFileName`" /qn"
-                $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
-
-                if ($installProcess.ExitCode -eq 0) {
-                    Write-SystemMessage -msg1 "- Google Chrome Enterprise installed successfully." -msg1Color "Green"
-                    Write-Log "Chrome Enterprise installed and enrolled."
-                } else {
-                    Write-ErrorMessage -msg "- Failed to install Google Chrome Enterprise. Exit code: $($installProcess.ExitCode)" -colour "Red"
-                    Write-Log "Failed to install Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
-                }
-            } finally {
-                Remove-Item -Path "$env:TEMP\$chromeFileName" -Force -ErrorAction SilentlyContinue
+            if ($installProcess.ExitCode -eq 0) {
+                Write-SystemMessage -msg1 "- Google Chrome Enterprise installed successfully." -msg1Color "Green"
+                Write-Log "Chrome Enterprise installed."
+            }
+            else {
+                Write-SystemMessage -msg1 "- Failed to install Google Chrome Enterprise. Exit code: $($installProcess.ExitCode)" -msg1Color "Red"
+                Write-Log "Failed to install Chrome Enterprise. Exit code: $($installProcess.ExitCode)"
             }
         }
-        Write-SuccessMessage -msg "Google Chrome Enterprise installation completed."
-    } else {
-        Write-Log "Skipping Google Chrome Enterprise installation as per configuration."
-        Write-SystemMessage -msg1 "Skipping Google Chrome Enterprise installation as per configuration." -msg1Color "Cyan"
+        finally {
+            Remove-Item -Path "$env:TEMP\$chromeFileName" -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -1244,40 +1239,35 @@ function Install-GCPW {
 
 # Function to install Google Drive
 function Install-GoogleDrive {
-    $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
+    $driveFileName = 'GoogleDriveFSSetup.exe'
+    $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
 
-    if ($installGoogleDrive -eq "TRUE") {
-        Write-SystemMessage -title "Installing Google Drive"
-        $driveFileName = 'GoogleDriveFSSetup.exe'
-        $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
-        if (Test-ProgramInstalled 'Google Drive') {
-            Write-SystemMessage -msg1 "- Google Drive is already installed. Skipping installation." -msg1Color "Cyan"
-            Write-Log 'Google Drive already installed. Skipping...'
-        } else {
-            Write-SystemMessage -msg1 "- Downloading: " -msg2 "Google Drive"
-            Write-Log "Downloading Google Drive from $driveUrl"
-            Invoke-WebRequest -Uri $driveUrl -OutFile "$env:TEMP\$driveFileName"
+    if (Test-ProgramInstalled 'Google Drive') {
+        Write-SystemMessage -msg1 "- Google Drive is already installed. Skipping installation." -msg1Color "Cyan"
+        Write-Log 'Google Drive already installed. Skipping...'
+    }
+    else {
+        Write-SystemMessage -msg1 "- Downloading: " -msg2 "Google Drive"
+        Write-Log "Downloading Google Drive from $driveUrl"
+        Invoke-WebRequest -Uri $driveUrl -OutFile "$env:TEMP\$driveFileName" | Out-Null
 
-            try {
-                Write-SystemMessage -msg1 "- Installing: " -msg2 "Google Drive"
-                Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent' -Wait
-                Write-Log 'Google Drive Installation completed successfully!'
-                Write-SystemMessage -msg1 "- Google Drive installed successfully." -msg1Color "Green"
-                
-            } catch {
-                Write-ErrorMessage -msg "Google Drive installation failed: $($_.Exception.Message)" -colour "Red"
-                Write-Log "Installation failed!"
-                Write-Log "Error: $($_.Exception.Message)"
-            } finally {
-                Remove-Item -Path "$env:TEMP\$driveFileName" -Force -ErrorAction SilentlyContinue
-            }
+        try {
+            Start-Process -FilePath "$env:TEMP\$driveFileName" -Verb runAs -ArgumentList '--silent' -Wait
+            Write-SystemMessage -msg1 "- Google Drive installed successfully." -msg1Color "Green"
+            Write-Log 'Google Drive Installation completed successfully!'
+            
         }
-        Write-SuccessMessage -msg "Google Drive installation completed."
-    } else {
-        Write-Log "Skipping Google Drive installation as per configuration."
-        Write-SystemMessage -msg1 "Skipping Google Drive installation as per configuration." -msg1Color "Cyan"
+        catch {
+            Write-ErrorMessage -msg "Google Drive Installation failed!"
+            Write-Log "Google Drive installation failed! Error: $($_.Exception.Message)"
+        }
+        finally {
+            Remove-Item -Path "$env:TEMP\$driveFileName" -Force -ErrorAction SilentlyContinue
+        }
     }
 }
+
+
 
 
 # Function to import tasks into Task Scheduler
