@@ -589,7 +589,7 @@ function Install-Office {
 
             Write-Log "Downloading and installing Microsoft Office..."
             Write-SystemMessage -msg1 "Downloading and installing Microsoft Office..."
-            $installProcess = Start-Process "$odtPath\Setup.exe" -ArgumentList "/configure `"$configurationXMLFile`"" -Wait -PassThru
+            $installProcess = Start-Process "$odtPath\Setup.exe" -ArgumentList "/configure `"$configurationXMLFile`"" -Wait -PassThru -WindowStyle Minimized
 
             if ($installProcess.ExitCode -eq 0) {
                 Write-Log "Microsoft Office installation completed successfully."
@@ -691,7 +691,7 @@ function Set-LockScreenImage {
             $registryFullPath = "$registryPath\$registryKey"
 
             if (!(Test-Path $registryFullPath)) {
-                New-Item -Path "$registryPath" -Name "$registryKey"
+                New-Item -Path "$registryPath" -Name "$registryKey" | Out-Null
             }
 
             $registryItems = @(
@@ -730,24 +730,15 @@ function Add-RegistryEntries {
         if ($registrySection) {
             Write-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
-                $entryDict = @{}
-                foreach ($item in $entry) {
-                    $keyValue = $item.Trim() -split "="
-                    if ($keyValue.Count -eq 2) {
-                        $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
-                    } else {
-                        Write-Log "Invalid key-value pair: $item"
-                        Write-ErrorMessage -msg "Invalid key-value pair: $item"
-                    }
-                }
+                $entry = $registrySection[$key] -replace "Path=", "" -replace '", Name="', "," -replace '", Type="', "," -replace '", Value="', "," -replace '"', ""
+                $entryArray = $entry -split ","
 
                 # Ensure all required fields are present
-                if ($entryDict.ContainsKey("Path") -and $entryDict.ContainsKey("Name") -and $entryDict.ContainsKey("Type") -and $entryDict.ContainsKey("Value")) {
-                    $path = $entryDict["Path"]
-                    $name = $entryDict["Name"]
-                    $type = $entryDict["Type"]
-                    $value = $entryDict["Value"]
+                if ($entryArray.Length -eq 4) {
+                    $path = $entryArray[0].Trim()
+                    $name = $entryArray[1].Trim()
+                    $type = $entryArray[2].Trim()
+                    $value = $entryArray[3].Trim()
 
                     Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
                     Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
@@ -773,6 +764,7 @@ function Add-RegistryEntries {
 
 
 
+
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
@@ -780,22 +772,13 @@ function Remove-RegistryEntries {
         if ($registrySection) {
             Write-SystemMessage -title "Removing Registry Entries"
             foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -split ","
-                $entryDict = @{}
-                foreach ($item in $entry) {
-                    $keyValue = $item.Trim() -split "="
-                    if ($keyValue.Count -eq 2) {
-                        $entryDict[$keyValue[0].Trim()] = $keyValue[1].Trim().Trim('"')
-                    } else {
-                        Write-Log "Invalid key-value pair: $item"
-                        Write-ErrorMessage -msg "Invalid key-value pair: $item"
-                    }
-                }
+                $entry = $registrySection[$key] -replace "Path=", "" -replace '", Name="', "," -replace '", Type="', "," -replace '", Value="', "," -replace '"', ""
+                $entryArray = $entry -split ","
 
                 # Ensure all required fields are present
-                if ($entryDict.ContainsKey("Path") -and $entryDict.ContainsKey("Name")) {
-                    $path = $entryDict["Path"]
-                    $name = $entryDict["Name"]
+                if ($entryArray.Length -eq 2) {
+                    $path = $entryArray[0].Trim()
+                    $name = $entryArray[1].Trim()
 
                     Write-Log "Removing registry entry: Path=$path, Name=$name"
                     Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
@@ -818,6 +801,7 @@ function Remove-RegistryEntries {
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
@@ -1207,15 +1191,15 @@ function Install-GCPW {
                     
                     try {
                         $gcpwRegistryPath = 'HKLM:\SOFTWARE\Policies\Google\CloudManagement'
-                        New-Item -Path $gcpwRegistryPath -Force -ErrorAction Stop
-                        Set-ItemProperty -Path $gcpwRegistryPath -Name "EnrollmentToken" -Value $googleEnrollmentToken -ErrorAction Stop
+                        New-Item -Path $gcpwRegistryPath -Force -ErrorAction Stop | Out-Null
+                        Set-ItemProperty -Path $gcpwRegistryPath -Name "EnrollmentToken" -Value $googleEnrollmentToken -ErrorAction Stop | Out-Null
                     } catch {
                         Write-ErrorMessage -msg "Error setting GCPW registry keys: $($_.Exception.Message)"
                         Write-Log "Error: $($_.Exception.Message)"
                     }
 
-                    Set-ItemProperty -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login" -Value $domainsAllowedToLogin
-                    $domains = Get-ItemPropertyValue -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login"
+                    Set-ItemProperty -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login" -Value $domainsAllowedToLogin | Out-Null
+                    $domains = Get-ItemPropertyValue -Path "HKLM:\Software\Google\GCPW" -Name "domains_allowed_to_login" | Out-Null
                     if ($domains -eq $domainsAllowedToLogin) {
                         Write-SystemMessage -msg1 "- Domains have been set successfully." -msg1Color "Green"
                         Write-Log 'Domains have been set'
@@ -1225,7 +1209,7 @@ function Install-GCPW {
                     Write-Log "Failed to install GCPW. Exit code: $($installProcess.ExitCode)"
                 }
             } finally {
-                Remove-Item -Path "$env:TEMP\$gcpwFileName" -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path "$env:TEMP\$gcpwFileName" -Force -ErrorAction SilentlyContinue | Out-Null
             }
         }
         Write-SuccessMessage -msg "Google Credential Provider for Windows (GCPW) installation completed."
