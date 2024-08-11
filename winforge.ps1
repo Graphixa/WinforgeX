@@ -756,7 +756,7 @@ function Add-RegistryEntries {
 
                 # Use RegistryTouch function to add the registry entry and check for success
                 try {
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue | Out-Null
                 } catch {
                     Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
                     Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
