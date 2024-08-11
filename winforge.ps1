@@ -743,7 +743,7 @@ function Add-RegistryEntries {
                     Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
 
                     # Use RegistryTouch for adding the registry entry
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue | Out-Null
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -779,7 +779,7 @@ function Remove-RegistryEntries {
                     Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
 
                     # Use RegistryTouch for removing the registry entry
-                    RegistryTouch -action "remove" -path $path -name $name | Out-Null
+                    RegistryTouch -action "remove" -path $path -name $name
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
