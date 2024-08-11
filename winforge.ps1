@@ -742,7 +742,8 @@ function Add-RegistryEntries {
                     Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue"
                     Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
 
-                    cmd.exe /c "reg add $path /v $name /t $type /d $expandedValue /f"
+                    # Command to add registry entry
+                    cmd.exe /c "reg add `"$path`" /v `"$name`" /t $type /d `"$expandedValue`" /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -751,7 +752,7 @@ function Add-RegistryEntries {
             Write-Log "Registry entries added successfully."
             Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
-            Write-Log "No registry entries to add. Missing configuration."
+            Write-Log "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty."
             Write-SystemMessage -msg1 "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
@@ -775,7 +776,8 @@ function Remove-RegistryEntries {
                     Write-Log "Removing registry entry: Path=$path, Name=$name"
                     Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
 
-                    cmd.exe /c "reg delete $path /v $name /f"
+                    # Command to remove registry entry
+                    cmd.exe /c "reg delete `"$path`" /v `"$name`" /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -784,7 +786,7 @@ function Remove-RegistryEntries {
             Write-Log "Registry entries removed successfully."
             Write-SuccessMessage -msg "Registry entries removed successfully."
         } else {
-            Write-Log "No registry entries to remove. Missing configuration."
+            Write-Log "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty."
             Write-SystemMessage -msg1 "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
