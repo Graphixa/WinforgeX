@@ -724,12 +724,9 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
-    Write-Host "Test 7"
-    Write-Log "Test 7"
+    Write-Host "Test 8"
+    Write-Log "Test 8"
     try {
-        # Log the entire config to see what we're working with
-        Write-Log "Full Config: $($config | Out-String)"
-
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
             Write-SystemMessage -title "Adding Registry Entries"
@@ -742,35 +739,16 @@ function Add-RegistryEntries {
             foreach ($entry in $registryEntries.GetEnumerator()) {
                 Write-Log "Processing Entry: $($entry | Out-String)"
 
-                # Split the entry into its components using a more controlled approach
-                $components = $entry.Value -split ","
+                # Extract the entire entry as a single string
+                $entryString = $entry.Key
 
-                # Log the split components
-                Write-Log "Components: $($components -join '|')"
+                # Extract components using regex to handle the entire line properly
+                $path = if ($entryString -match 'Path="([^"]+)"') { $matches[1] } else { $null }
+                $name = if ($entryString -match 'Name="([^"]+)"') { $matches[1] } else { $null }
+                $type = if ($entryString -match 'Type="([^"]+)"') { $matches[1] } else { $null }
+                $value = if ($entryString -match 'Value="([^"]+)"') { $matches[1] } else { $null }
 
-                # Check if the components array has the expected number of items
-                if ($components.Length -ne 4) {
-                    Write-Log "Unexpected number of components: $($components.Length)"
-                    continue
-                }
-
-                $pathArray = $components[0].Split("=")
-                $path = $pathArray[1].Trim('"').Trim()
-                Write-Log "Path Component: $($pathArray -join '|')"
-                
-                $nameArray = $components[1].Split("=")
-                $name = $nameArray[1].Trim('"').Trim()
-                Write-Log "Name Component: $($nameArray -join '|')"
-                
-                $typeArray = $components[2].Split("=")
-                $type = $typeArray[1].Trim('"').Trim()
-                Write-Log "Type Component: $($typeArray -join '|')"
-                
-                $valueArray = $components[3].Split("=")
-                $value = $valueArray[1].Trim('"').Trim()
-                Write-Log "Value Component: $($valueArray -join '|')"
-
-                # Debugging: Log each part to check if they're parsed correctly
+                # Debugging: Log each extracted part to check if they're parsed correctly
                 Write-Log "Parsed Entry: Path=$path, Name=$name, Type=$type, Value=$value"
 
                 # Check for null or empty values
@@ -800,6 +778,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
