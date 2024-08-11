@@ -724,6 +724,9 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
+
+    Write-Log "Exhibit - 1"
+    Write-SystemMessage -msg1 "Exhibit 1"
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
