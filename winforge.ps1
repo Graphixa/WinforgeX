@@ -728,79 +728,57 @@ function Add-RegistryEntries {
     try {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
-            Write-SystemMessage -title "Adding Registry Entries"
             foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -replace "Path=", "" -replace '", Name="', "," -replace '", Type="', "," -replace '", Value="', "," -replace '"', ""
-                $entryArray = $entry -split ","
+                $entry = $registrySection[$key] -split ","
+                if ($entry.Length -eq 4) {
+                    $keyName = $entry[0].Trim()
+                    $value = $entry[1].Trim()
+                    $type = $entry[2].Trim()
+                    $data = $entry[3].Trim()
 
-                # Ensure all required fields are present
-                if ($entryArray.Length -eq 4) {
-                    $path = $entryArray[0].Trim()
-                    $name = $entryArray[1].Trim()
-                    $type = $entryArray[2].Trim()
-                    $value = $entryArray[3].Trim()
-
-                    Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
-                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
-
-                    # Use RegistryTouch for adding the registry entry
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value | Out-Null
+                    Write-Log "Adding registry entry: KeyName=${keyName}, Value=${value}, Type=${type}, Data=${data}"
+                    cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${data} /f"
                 } else {
-                    Write-Log "Missing required registry entry fields for: $key"
-                    Write-ErrorMessage -msg "Missing required registry entry fields for: $key"
+                    Write-Log "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries added successfully."
-            Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
-            Write-Log "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty."
-            Write-SystemMessage -msg1 "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty." -msg1Color "Yellow"
+            Write-Log "No registry entries to add. Missing configuration."
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
+        exit 1
     }
 }
-
-
-
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
-            Write-SystemMessage -title "Removing Registry Entries"
             foreach ($key in $registrySection.Keys) {
-                $entry = $registrySection[$key] -replace "Path=", "" -replace '", Name="', "," -replace '", Type="', "," -replace '", Value="', "," -replace '"', ""
-                $entryArray = $entry -split ","
+                $entry = $registrySection[$key] -split ","
+                if ($entry.Length -eq 2) {
+                    $keyName = $entry[0].Trim()
+                    $value = $entry[1].Trim()
 
-                # Ensure all required fields are present
-                if ($entryArray.Length -eq 2) {
-                    $path = $entryArray[0].Trim()
-                    $name = $entryArray[1].Trim()
-
-                    Write-Log "Removing registry entry: Path=$path, Name=$name"
-                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
-
-                    # Use RegistryTouch for removing the registry entry
-                    RegistryTouch -action "remove" -path $path -name $name | Out-Null
+                    Write-Log "Removing registry entry: KeyName=${keyName}, Value=${value}"
+                    cmd.exe /c "reg delete ${keyName} /v ${value} /f"
                 } else {
-                    Write-Log "Missing required registry entry fields for: $key"
-                    Write-ErrorMessage -msg "Missing required registry entry fields for: $key"
+                    Write-Log "Invalid registry entry format: $key"
                 }
             }
             Write-Log "Registry entries removed successfully."
-            Write-SuccessMessage -msg "Registry entries removed successfully."
         } else {
-            Write-Log "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty."
-            Write-SystemMessage -msg1 "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty." -msg1Color "Yellow"
+            Write-Log "No registry entries to remove. Missing configuration."
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
+        exit 1
     }
 }
+
 
 
 
