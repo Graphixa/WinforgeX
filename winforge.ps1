@@ -729,8 +729,8 @@ function Add-RegistryEntries {
         $registrySection = $config["RegistryAdd"]
         if ($registrySection) {
             Write-SystemMessage -title "Adding Registry Entries"
-            foreach ($entry in $registrySection) {
-                $entryParts = $entry.Split(",").Trim()
+            foreach ($entry in $registrySection.GetEnumerator()) {
+                $entryParts = $entry.Value.Split(",").Trim()
                 $path = $entryParts[0].Split("=")[1].Trim().Trim('"')
                 $name = $entryParts[1].Split("=")[1].Trim().Trim('"')
                 $type = $entryParts[2].Split("=")[1].Trim().Trim('"')
@@ -757,20 +757,14 @@ function Add-RegistryEntries {
     }
 }
 
-
-
-
-
-
-
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
         $registrySection = $config["RegistryRemove"]
         if ($registrySection) {
             Write-SystemMessage -title "Removing Registry Entries"
-            foreach ($entry in $registrySection) {
-                $entryParts = $entry.Split(",").Trim()
+            foreach ($entry in $registrySection.GetEnumerator()) {
+                $entryParts = $entry.Value.Split(",").Trim()
                 $path = $entryParts[0].Split("=")[1].Trim().Trim('"')
                 $name = $entryParts[1].Split("=")[1].Trim().Trim('"')
 
@@ -794,9 +788,6 @@ function Remove-RegistryEntries {
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
-
-
-
 
 
 
