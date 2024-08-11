@@ -724,6 +724,7 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
+    Write-Log "Archival 01"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
@@ -734,10 +735,17 @@ function Add-RegistryEntries {
             foreach ($entry in $registryEntries.GetEnumerator()) {
                 # Split the entry into its components
                 $path, $name, $type, $value = $entry.Value -split ","
-                $path = $path.Split("=")[1].Trim('"')
-                $name = $name.Split("=")[1].Trim('"')
-                $type = $type.Split("=")[1].Trim('"')
-                $value = $value.Split("=")[1].Trim('"')
+                $path = $path -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
+                $name = $name -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
+                $type = $type -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
+                $value = $value -replace '^.*=', '' | ForEach-Object { $_.Trim('"') }
+
+                # Check for null or empty values
+                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
+                    Write-Log "Skipping invalid registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
+                    Write-SystemMessage -msg1 "Skipping invalid registry entry. Missing values." -msg1Color "Yellow"
+                    continue
+                }
 
                 # Log and apply the registry entry
                 Write-SystemMessage -msg1 "- Adding: " -msg2 "$name at $path with type $type and value $value"
@@ -759,6 +767,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 # Function to configure power settings
