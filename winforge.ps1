@@ -731,18 +731,18 @@ function Add-RegistryEntries {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 4) {
-                    $path = $entry[0].Split("=")[1].Trim().Trim('"')
-                    $name = $entry[1].Split("=")[1].Trim().Trim('"')
-                    $type = $entry[2].Split("=")[1].Trim().Trim('"')
-                    $value = $entry[3].Split("=")[1].Trim().Trim('"')
+                    $path = ($entry[0] -split "=")[1].Trim().Trim('"')
+                    $name = ($entry[1] -split "=")[1].Trim().Trim('"')
+                    $type = ($entry[2] -split "=")[1].Trim().Trim('"')
+                    $value = ($entry[3] -split "=")[1].Trim().Trim('"')
 
                     # Expand environment variables in the value
                     $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
 
-                    Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
-                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+                    Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue"
+                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
 
-                    cmd.exe /c "reg add ${path} /v ${name} /t ${type} /d ${expandedValue} /f"
+                    cmd.exe /c "reg add $path /v $name /t $type /d $expandedValue /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -769,13 +769,13 @@ function Remove-RegistryEntries {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 4) {
-                    $path = $entry[0].Split("=")[1].Trim().Trim('"')
-                    $name = $entry[1].Split("=")[1].Trim().Trim('"')
+                    $path = ($entry[0] -split "=")[1].Trim().Trim('"')
+                    $name = ($entry[1] -split "=")[1].Trim().Trim('"')
 
-                    Write-Log "Removing registry entry: Path=${path}, Name=${name}"
-                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=${path}, Name=${name}"
+                    Write-Log "Removing registry entry: Path=$path, Name=$name"
+                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=$path, Name=$name"
 
-                    cmd.exe /c "reg delete ${path} /v ${name} /f"
+                    cmd.exe /c "reg delete $path /v $name /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -792,6 +792,7 @@ function Remove-RegistryEntries {
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
     }
 }
+
 
 
 
