@@ -742,7 +742,7 @@ function Add-RegistryEntries {
                 # Manually expand $env: variables in the $value string
                 $expandedValue = $value -replace '\$env:([a-zA-Z_][a-zA-Z0-9_]*)', {
                     param($matches)
-                    Get-Variable -Name $matches[1] -Scope Global | ForEach-Object { $_.Value }
+                    return (Get-Item "env:$($matches[1])").Value
                 }
 
                 # Check for null or empty values and log error, but continue loop
@@ -778,6 +778,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
