@@ -740,7 +740,7 @@ function Add-RegistryEntries {
                 $value = $entry.Value
 
                 # Expand environment variables in the value
-                $expandedValue = $value -replace '\$env:([a-zA-Z_][a-zA-Z0-9_]*)', { Get-Variable $_.Matches[1].Value -Scope Global }.Value
+                $expandedValue = [Environment]::ExpandEnvironmentVariables($value)
 
                 # Check for null or empty values and log error, but continue loop
                 if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($expandedValue)) {
@@ -775,6 +775,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 
 
