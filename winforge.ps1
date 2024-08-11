@@ -739,24 +739,27 @@ function Add-RegistryEntries {
                 $type = if ($entry.Key -match 'Type="([^"]+)"') { $matches[1] } else { $null }
                 $value = $entry.Value
 
+                # Expand environment variables in the $value string
+                $expandedValue = [Environment]::ExpandEnvironmentVariables($value)
+
                 # Check for null or empty values and log error, but continue loop
-                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
-                    $errorMessage = "One or more registry entry components are missing or improperly formatted. Please correct your configuration file. Path=$path, Name=$name, Type=$type, Value=$value"
+                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($expandedValue)) {
+                    $errorMessage = "One or more registry entry components are missing or improperly formatted. Please correct your configuration file. Path=$path, Name=$name, Type=$type, Value=$expandedValue"
                     Write-Log $errorMessage
                     Write-ErrorMessage -msg $errorMessage
                     continue  # Skip this entry and continue with the next one
                 }
 
                 # Log and apply the registry entry
-                Write-SystemMessage -msg1 "- Adding registry entry: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$value"
-                Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
+                Write-SystemMessage -msg1 "- Adding registry entry: " -msg2 "Path=$path, Name=$name, Type=$type, Value=$expandedValue"
+                Write-Log "Adding registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue"
 
                 # Use RegistryTouch function to add the registry entry and check for success
                 try {
-                    RegistryTouch -action "add" -path $path -name $name -type $type -value $value | Out-Null
+                    RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue
                 } catch {
-                    Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
-                    Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$value. Error: $($_.Exception.Message)"
+                    Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
+                    Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
                     continue
                 }
             }
@@ -772,6 +775,7 @@ function Add-RegistryEntries {
         Return
     }
 }
+
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
