@@ -724,7 +724,7 @@ function Set-LockScreenImage {
 
 # Function to add registry entries
 function Add-RegistryEntries {
-    Write-Log "Test 03"
+    Write-Host "Test 04a"
     try {
         # Check if the RegistryAdd section exists in the config
         if ($config.ContainsKey("RegistryAdd")) {
@@ -733,21 +733,12 @@ function Add-RegistryEntries {
 
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
-                # The entry is a single string, so we need to split it manually
-                $entryString = $entry.Value
-
-                # Extract the Path, Name, Type, and Value using regex or string parsing
-                $path = if ($entryString -match 'Path="([^"]+)"') { $matches[1] } else { $null }
-                $name = if ($entryString -match 'Name="([^"]+)"') { $matches[1] } else { $null }
-                $type = if ($entryString -match 'Type="([^"]+)"') { $matches[1] } else { $null }
-                $value = if ($entryString -match 'Value="([^"]+)"') { $matches[1] } else { $null }
-
-                # Check for null or empty values
-                if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($type) -or [string]::IsNullOrWhiteSpace($value)) {
-                    Write-Log "Skipping invalid registry entry: Path=$path, Name=$name, Type=$type, Value=$value"
-                    Write-SystemMessage -msg1 "Skipping invalid registry entry. Missing values." -msg1Color "Yellow"
-                    continue
-                }
+                # Split the entry into its components
+                $path, $name, $type, $value = $entry.Value -split ","
+                $path = $path.Split("=")[1].Trim('"')
+                $name = $name.Split("=")[1].Trim('"')
+                $type = $type.Split("=")[1].Trim('"')
+                $value = $value.Split("=")[1].Trim('"')
 
                 # Log and apply the registry entry
                 Write-SystemMessage -msg1 "- Adding: " -msg2 "$name at $path with type $type and value $value"
