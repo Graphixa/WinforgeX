@@ -731,17 +731,18 @@ function Add-RegistryEntries {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 4) {
-                    $keyName = $entry[0].Trim()
-                    $value = $entry[1].Trim()
+                    $path = $entry[0].Trim()
+                    $name = $entry[1].Trim()
                     $type = $entry[2].Trim()
-                    $data = $entry[3].Trim()
+                    $value = $entry[3].Trim()
 
-                    # Expand environment variables in the data value
-                    $expandedData = [System.Environment]::ExpandEnvironmentVariables($data)
+                    # Expand environment variables in the value
+                    $expandedValue = [System.Environment]::ExpandEnvironmentVariables($value)
 
-                    Write-Log "Adding registry entry: KeyName=${keyName}, Value=${value}, Type=${type}, Data=${expandedData}"
-                    Write-SystemMessage -msg1 "- Adding: " -msg2 "KeyName=${keyName}, Value=${value}, Type=${type}, Data=${expandedData}"
-                    cmd.exe /c "reg add ${keyName} /v ${value} /t ${type} /d ${expandedData} /f"
+                    Write-Log "Adding registry entry: Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+                    Write-SystemMessage -msg1 "- Adding: " -msg2 "Path=${path}, Name=${name}, Type=${type}, Value=${expandedValue}"
+
+                    cmd.exe /c "reg add ${path} /v ${name} /t ${type} /d ${expandedValue} /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -751,15 +752,13 @@ function Add-RegistryEntries {
             Write-SuccessMessage -msg "Registry entries added successfully."
         } else {
             Write-Log "No registry entries to add. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Yellow"
+            Write-SystemMessage -msg1 "No registry entries to add. Configuration section 'RegistryAdd' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error adding registry entries: $($_.Exception.Message)"
         Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
-        Return
     }
 }
-
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
@@ -770,12 +769,13 @@ function Remove-RegistryEntries {
             foreach ($key in $registrySection.Keys) {
                 $entry = $registrySection[$key] -split ","
                 if ($entry.Length -eq 2) {
-                    $keyName = $entry[0].Trim()
-                    $value = $entry[1].Trim()
+                    $path = $entry[0].Trim()
+                    $name = $entry[1].Trim()
 
-                    Write-Log "Removing registry entry: KeyName=${keyName}, Value=${value}"
-                    Write-SystemMessage -msg1 "- Removing: " -msg2 "KeyName=${keyName}, Value=${value}"
-                    cmd.exe /c "reg delete ${keyName} /v ${value} /f"
+                    Write-Log "Removing registry entry: Path=${path}, Name=${name}"
+                    Write-SystemMessage -msg1 "- Removing: " -msg2 "Path=${path}, Name=${name}"
+
+                    cmd.exe /c "reg delete ${path} /v ${name} /f"
                 } else {
                     Write-Log "Invalid registry entry format: $key"
                     Write-ErrorMessage -msg "Invalid registry entry format: $key"
@@ -785,12 +785,11 @@ function Remove-RegistryEntries {
             Write-SuccessMessage -msg "Registry entries removed successfully."
         } else {
             Write-Log "No registry entries to remove. Missing configuration."
-            Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Yellow"
+            Write-SystemMessage -msg1 "No registry entries to remove. Configuration section 'RegistryRemove' is missing or empty." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error removing registry entries: $($_.Exception.Message)"
         Write-ErrorMessage -msg "Error removing registry entries: $($_.Exception.Message)"
-        Return
     }
 }
 
