@@ -785,6 +785,8 @@ function Set-LockScreenImage {
     }
 }
 
+
+
 function Set-ThemeSettings {
     Write-SystemMessage -title "Applying Theme Settings"
 
@@ -823,45 +825,6 @@ function Set-ThemeSettings {
     } else {
         Write-Log "Dark Mode setting not provided. Skipping."
     }
-
-    function Set-ThemeSettings {
-        Write-SystemMessage -title "Applying Theme Settings"
-    
-        # Set Desktop Icon Size
-        $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
-        if ($desktopIconSize) {
-            Write-Log "Setting Desktop Icon Size to: $desktopIconSize"
-            Write-SystemMessage -msg1 "- Setting Desktop Icon Size to: " -msg2 $desktopIconSize
-            
-            # Switch based on the size selected
-            switch ($desktopIconSize) {
-                "Small" { $iconSizeValue = 16 }
-                "Medium" { $iconSizeValue = 32 }
-                "Large" { $iconSizeValue = 48 }
-                default { 
-                    Write-Log "Invalid Desktop Icon Size specified: $desktopIconSize. Skipping."
-                    return
-                }
-            }
-            
-            try {
-                # Apply icon size in the correct registry path
-                New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -Name "IconSize" -Value $iconSizeValue -PropertyType DWord -Force | Out-Null
-                Write-Log "Desktop Icon Size set to $desktopIconSize ($iconSizeValue)."
-                # Restart explorer to apply changes
-                Stop-Process -Name explorer -Force
-                Start-Process explorer
-            } catch {
-                Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "Failed to set Desktop Icon Size."
-            }
-        } else {
-            Write-Log "Desktop Icon Size not set. Missing configuration."
-        }
-    
-        # ... Other theme settings (AccentColor, DarkMode, etc.) ...
-    }
-    
 
     # Set Transparency Effects
     $transparencyEffects = Get-ConfigValue -section "Theme" -key "TransparencyEffects"
@@ -911,6 +874,38 @@ function Set-ThemeSettings {
         }
     } else {
         Write-Log "Window Animations not set. Missing configuration."
+    }
+
+    # Set Desktop Icon Size
+    $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
+    if ($desktopIconSize) {
+        Write-Log "Setting Desktop Icon Size to: $desktopIconSize"
+        Write-SystemMessage -msg1 "- Setting Desktop Icon Size to: " -msg2 $desktopIconSize
+        
+        # Switch based on the size selected
+        switch ($desktopIconSize) {
+            "Small" { $iconSizeValue = 16 }
+            "Medium" { $iconSizeValue = 32 }
+            "Large" { $iconSizeValue = 48 }
+            default { 
+                Write-Log "Invalid Desktop Icon Size specified: $desktopIconSize. Skipping."
+                return
+            }
+        }
+        
+        try {
+            # Apply icon size in the correct registry path
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -Name "IconSize" -Value $iconSizeValue -PropertyType DWord -Force | Out-Null
+            Write-Log "Desktop Icon Size set to $desktopIconSize ($iconSizeValue)."
+            # Restart explorer to apply changes
+            Stop-Process -Name explorer -Force
+            Start-Process explorer
+        } catch {
+            Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Desktop Icon Size."
+        }
+    } else {
+        Write-Log "Desktop Icon Size not set. Missing configuration."
     }
 
     Write-Log "Theme Settings configuration completed."
