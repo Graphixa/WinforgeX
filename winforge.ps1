@@ -1262,8 +1262,7 @@ function Set-EnvironmentVariables {
             Write-Log "Environment variables set successfully."
             Write-SuccessMessage -msg "Environment variables set successfully."
         } else {
-            Write-Log "No environment variables to set. Missing configuration."
-            Write-SystemMessage -msg1 "No environment variables to set. Missing configuration." -msg1Color "Cyan"
+            Write-Log "No environment variables set. Missing configuration."
         }
     } catch {
         Write-Log "Error setting environment variables: $($_.Exception.Message)"
@@ -1275,6 +1274,19 @@ function Set-EnvironmentVariables {
 
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
+
+    $InstallGoogleChrome = Get-ConfigValue -section "Google" -key "InstallGoogleChrome"
+
+    if (!$InstallGoogleChrome){
+        Write-Log "Skipping Google Chrome Enterprise installation. Missing configuration."
+        return
+    }
+
+    if ($InstallGoogleChrome -ne "TRUE")
+    {
+        return
+    }
+
     $chromeFileName = if ([Environment]::Is64BitOperatingSystem) {
         'googlechromestandaloneenterprise64.msi'
     }
@@ -1390,7 +1402,12 @@ function Install-GoogleDrive {
     $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
 
     if (!$installGoogleDrive){
-        Write-Log "Skipping Google Credential Provider for Windows (GCPW) installation. Missing configuration."
+        Write-Log "Skipping Google Drive installation. Missing configuration."
+        return
+    }
+
+    if ($installGoogleDrive -ne "TRUE")
+    {
         return
     }
 
@@ -1524,6 +1541,7 @@ function Import-Tasks {
 
 # Function to activate Windows
 function Activate-Windows {
+
     try {
         $productKey = Get-ConfigValue -section "Activation" -key "ProductKey"
         $version = Get-ConfigValue -section "Activation" -key "Version"
@@ -1539,7 +1557,6 @@ function Activate-Windows {
             Write-SuccessMessage -msg "Windows activation completed."
         } else {
             Write-Log "Windows activation not performed. Missing configuration."
-            Write-SystemMessage -msg1 "Windows activation not performed. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-ErrorMessage -msg "Error activating Windows: $($_.Exception.Message)"
