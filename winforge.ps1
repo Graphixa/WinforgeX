@@ -432,78 +432,60 @@ function Install-WingetApps {
 
 # Function to install Chocolatey and Chocolatey Apps
 function Install-ChocolateyApps {
-    $packageManager = Get-ConfigValue -section "Applications" -key "PackageManager"
-
-    # Only proceed if Chocolatey is the selected package manager
-    if ($packageManager -ne "Chocolatey") {
-        Write-Log "Chocolatey is not selected as the package manager. Skipping Chocolatey app installation."
-        return
-    }
-
     try {
+        # Check if ChocolateyApps is configured
         $chocoApps = Get-ConfigValue -section "Applications" -key "ChocolateyApps"
-        
         if ($chocoApps) {
-            Write-SystemMessage -title "Installing Chocolatey and Apps"
-            Write-Log "ChocolateyApps setting found. Checking if Chocolatey is installed."
+            Write-Log "Detected Chocolatey apps for installation: $chocoApps"
 
-            # Check if Chocolatey is installed
+            # Check if Chocolatey is installed, and if not, install it
             if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-                Write-SystemMessage -msg1 "- Chocolatey is not installed. Installing Chocolatey."
-                Write-Log "Chocolatey is not installed. Installing..."
-                
-                # Install Chocolatey
-                Set-ExecutionPolicy Bypass -Scope Process -Force;
-                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
+                Write-SystemMessage -msg1 "Chocolatey not found, installing Chocolatey..."
+                Write-Log "Installing Chocolatey..."
+                Set-ExecutionPolicy Bypass -Scope Process -Force
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
                 Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
                 if (Get-Command choco -ErrorAction SilentlyContinue) {
-                    Write-SystemMessage -msg1 "- Chocolatey installed successfully." -msg1Color "Green"
+                    Write-SystemMessage -msg1 "Chocolatey installed successfully." -msg1Color "Green"
                     Write-Log "Chocolatey installed successfully."
                 } else {
                     Write-ErrorMessage -msg "Failed to install Chocolatey."
-                    Write-Log "Error: Chocolatey installation failed."
+                    Write-Log "Failed to install Chocolatey."
                     return
                 }
-            } else {
-                Write-SystemMessage -msg1 "- Chocolatey is already installed." -msg1Color "Cyan"
-                Write-Log "Chocolatey is already installed. Skipping installation."
             }
 
-            # Split the ChocolateyApps string and install each app
-            $appList = $chocoApps -split ',' | ForEach-Object { $_.Trim() }
-            
+            # Split the list of Chocolatey apps and install each one
+            $appList = $chocoApps -split ',' | ForEach-Object { $_.Trim() }  # Split by comma and trim whitespace
+
             foreach ($app in $appList) {
-                if (-not (choco list --local-only | Select-String -Pattern $app)) {
-                    Write-SystemMessage -msg1 "- Installing: " -msg2 $app
-                    Write-Log "Installing $app via Chocolatey"
-                    
-                    # Install the app via Chocolatey
-                    try {
-                        choco install $app -y --ignore-checksums
-                        Write-SystemMessage -msg1 "- $app installed successfully." -msg1Color "Green"
-                        Write-Log "$app installed successfully."
-                    } catch {
-                        Write-ErrorMessage -msg "Error installing $app. $($_.Exception.Message)"
-                        Write-Log "Error installing ${app}: $($_.Exception.Message)"
-                    }
-                } else {
-                    Write-SystemMessage -msg1 "- $app is already installed. Skipping." -msg1Color "Cyan"
-                    Write-Log "$app is already installed. Skipping."
+                Write-Log "Installing Chocolatey app: $app"
+
+                # Use double quotes around app name to avoid issues with special characters
+                try {
+                    Start-Process -NoNewWindow -Wait -FilePath "choco" -ArgumentList "install `"$app`" -y" -ErrorAction Stop
+                    Write-Log "$app installed successfully."
+                    Write-SystemMessage -msg1 "$app installed successfully." -msg1Color "Green"
+                } catch {
+                    Write-Log "Error installing ${app}: $($_.Exception.Message)"
+                    Write-ErrorMessage -msg "Error installing ${app}: $($_.Exception.Message)"
                 }
             }
 
+            Write-Log "All Chocolatey apps installation completed."
             Write-SuccessMessage -msg "Chocolatey apps installed successfully."
         } else {
-            Write-Log "No ChocolateyApps setting found. Skipping Chocolatey installation."
-            Write-SystemMessage -msg1 "No ChocolateyApps setting found. Skipping installation." -msg1Color "Cyan"
+            Write-Log "No Chocolatey apps provided for installation."
+            Write-SystemMessage -msg1 "No Chocolatey apps provided for installation." -msg1Color "Cyan"
         }
     } catch {
         Write-ErrorMessage -msg "Error in Chocolatey installation process: $($_.Exception.Message)"
-        Write-Log "Error installing Chocolatey apps: $($_.Exception.Message)"
-        Return
+        Write-Log "Error in Chocolatey installation process: $($_.Exception.Message)"
+        return
     }
 }
+
 
 
 
