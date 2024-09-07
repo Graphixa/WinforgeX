@@ -788,13 +788,18 @@ function Set-LockScreenImage {
 function Set-ThemeSettings {
     Write-SystemMessage -title "Applying Theme Settings"
 
-    # Set Accent Colour
+    # Set Accent Color
     $accentColor = Get-ConfigValue -section "Theme" -key "AccentColor"
     if ($accentColor) {
         Write-Log "Setting Accent Color to: $accentColor"
         Write-SystemMessage -msg1 "- Setting Accent Color to: " -msg2 $accentColor
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemAccentColor" -Value ([convert]::ToInt32($accentColor.Replace('#',''),16)) -PropertyType DWord -Force | Out-Null
+            $accentColor = $accentColor.TrimStart("#")
+            $accentColorDecimal = [convert]::ToInt32($accentColor, 16)
+
+            # Set accent color in registry
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "StartColorMenu" -Value $accentColorDecimal -PropertyType DWord -Force | Out-Null
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "AccentColorMenu" -Value $accentColorDecimal -PropertyType DWord -Force | Out-Null
         } catch {
             Write-Log "Error setting Accent Color: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to set Accent Color."
@@ -819,58 +824,44 @@ function Set-ThemeSettings {
         Write-Log "Dark Mode setting not provided. Skipping."
     }
 
-    # Set Taskbar Position
-    $taskbarPosition = Get-ConfigValue -section "Theme" -key "TaskbarPosition"
-    if ($taskbarPosition) {
-        Write-Log "Setting Taskbar Position to: $taskbarPosition"
-        Write-SystemMessage -msg1 "- Setting Taskbar Position to: " -msg2 $taskbarPosition
-        try {
-            $positionMap = @{
-                "Bottom" = 1
-                "Top"    = 0
-                "Left"   = 3
-                "Right"  = 2
+    function Set-ThemeSettings {
+        Write-SystemMessage -title "Applying Theme Settings"
+    
+        # Set Desktop Icon Size
+        $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
+        if ($desktopIconSize) {
+            Write-Log "Setting Desktop Icon Size to: $desktopIconSize"
+            Write-SystemMessage -msg1 "- Setting Desktop Icon Size to: " -msg2 $desktopIconSize
+            
+            # Switch based on the size selected
+            switch ($desktopIconSize) {
+                "Small" { $iconSizeValue = 16 }
+                "Medium" { $iconSizeValue = 32 }
+                "Large" { $iconSizeValue = 48 }
+                default { 
+                    Write-Log "Invalid Desktop Icon Size specified: $desktopIconSize. Skipping."
+                    return
+                }
             }
-            if ($positionMap.ContainsKey($taskbarPosition)) {
-                New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" -Name "Settings" -Value ([byte[]]@($positionMap[$taskbarPosition])) -PropertyType Binary -Force | Out-Null
+            
+            try {
+                # Apply icon size in the correct registry path
+                New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -Name "IconSize" -Value $iconSizeValue -PropertyType DWord -Force | Out-Null
+                Write-Log "Desktop Icon Size set to $desktopIconSize ($iconSizeValue)."
+                # Restart explorer to apply changes
                 Stop-Process -Name explorer -Force
                 Start-Process explorer
-            } else {
-                Write-Log "Invalid Taskbar Position: $taskbarPosition"
-                Write-ErrorMessage -msg "Invalid Taskbar Position."
+            } catch {
+                Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to set Desktop Icon Size."
             }
-        } catch {
-            Write-Log "Error setting Taskbar Position: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Failed to set Taskbar Position."
+        } else {
+            Write-Log "Desktop Icon Size not set. Missing configuration."
         }
-    } else {
-        Write-Log "Taskbar Position not set. Missing configuration."
+    
+        # ... Other theme settings (AccentColor, DarkMode, etc.) ...
     }
-
-    # Set Desktop Icon Size
-    $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
-    if ($desktopIconSize) {
-        Write-Log "Setting Desktop Icon Size to: $desktopIconSize"
-        Write-SystemMessage -msg1 "- Setting Desktop Icon Size to: " -msg2 $desktopIconSize
-        try {
-            $iconSizeMap = @{
-                "Small"  = 48
-                "Medium" = 96
-                "Large"  = 192
-            }
-            if ($iconSizeMap.ContainsKey($desktopIconSize)) {
-                New-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "Shell Icon Size" -Value $iconSizeMap[$desktopIconSize] -PropertyType String -Force | Out-Null
-            } else {
-                Write-Log "Invalid Desktop Icon Size: $desktopIconSize"
-                Write-ErrorMessage -msg "Invalid Desktop Icon Size."
-            }
-        } catch {
-            Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Failed to set Desktop Icon Size."
-        }
-    } else {
-        Write-Log "Desktop Icon Size not set. Missing configuration."
-    }
+    
 
     # Set Transparency Effects
     $transparencyEffects = Get-ConfigValue -section "Theme" -key "TransparencyEffects"
@@ -910,7 +901,10 @@ function Set-ThemeSettings {
         Write-Log "Setting Window Animations to: $windowAnimations"
         Write-SystemMessage -msg1 "- Setting Window Animations to: " -msg2 $windowAnimations
         try {
-            New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $animationValue -PropertyType Binary -Force | Out-Null
+            # Adjust the UserPreferencesMask for enabling/disabling window animations
+            $currentMask = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask").UserPreferencesMask
+            $updatedMask = if ($windowAnimations -eq "TRUE") { $currentMask -bor 0x20 } else { $currentMask -band 0xDF }
+            Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $updatedMask -ErrorAction Stop
         } catch {
             Write-Log "Error setting Window Animations: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to set Window Animations."
@@ -922,6 +916,7 @@ function Set-ThemeSettings {
     Write-Log "Theme Settings configuration completed."
     Write-SuccessMessage -msg "Theme Settings applied successfully."
 }
+
 
 
 
