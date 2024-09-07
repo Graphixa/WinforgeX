@@ -1174,11 +1174,11 @@ function Set-SecuritySettings {
 
         # Show/Hide file extensions
         if ($showFileExtensions -eq "TRUE") {
-            Write-SystemMessage -msg1 "- Showing file extensions..."
+            Write-SystemMessage -msg1 "- Showing file extensions in Explorer."
             Write-Log "Configuring file type extension visibility to show"
             $fileExtValue = 0
         } elseif ($showFileExtensions -eq "FALSE") {
-            Write-SystemMessage -msg1 "- Hiding file extensions..."
+            Write-SystemMessage -msg1 "- Hiding file extensions in Explorer."
             Write-Log "Configuring file type extension visibility to hide"
             $fileExtValue = 1
         } else {
