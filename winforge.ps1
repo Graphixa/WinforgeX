@@ -790,26 +790,6 @@ function Set-LockScreenImage {
 function Set-ThemeSettings {
     Write-SystemMessage -title "Applying Theme Settings"
 
-    # Set Accent Color
-    $accentColor = Get-ConfigValue -section "Theme" -key "AccentColor"
-    if ($accentColor) {
-        Write-Log "Setting Accent Color to: $accentColor"
-        Write-SystemMessage -msg1 "- Setting Accent Color to: " -msg2 $accentColor
-        try {
-            $accentColor = $accentColor.TrimStart("#")
-            $accentColorDecimal = [convert]::ToInt32($accentColor, 16)
-
-            # Set accent color in registry
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "StartColorMenu" -Value $accentColorDecimal -PropertyType DWord -Force | Out-Null
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "AccentColorMenu" -Value $accentColorDecimal -PropertyType DWord -Force | Out-Null
-        } catch {
-            Write-Log "Error setting Accent Color: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Failed to set Accent Color."
-        }
-    } else {
-        Write-Log "Accent Color not set. Missing configuration."
-    }
-
     # Enable Dark Mode (TRUE or FALSE)
     $darkMode = Get-ConfigValue -section "Theme" -key "DarkMode"
     if ($darkMode) {
@@ -842,20 +822,6 @@ function Set-ThemeSettings {
         Write-Log "Transparency Effects not set. Missing configuration."
     }
 
-    # Set Lock Screen Message
-    $lockScreenMessage = Get-ConfigValue -section "Theme" -key "LockScreenMessage"
-    if ($lockScreenMessage) {
-        Write-Log "Setting Lock Screen Message to: $lockScreenMessage"
-        Write-SystemMessage -msg1 "- Setting Lock Screen Message to: " -msg2 $lockScreenMessage
-        try {
-            New-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\System" -Name "LegalNoticeText" -Value $lockScreenMessage -PropertyType String -Force | Out-Null
-        } catch {
-            Write-Log "Error setting Lock Screen Message: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Failed to set Lock Screen Message."
-        }
-    } else {
-        Write-Log "Lock Screen Message not set. Missing configuration."
-    }
 
     # Set Desktop Icon Size
     $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
@@ -1170,8 +1136,7 @@ function Set-Bitlocker {
             Write-Log "BitLocker disabled successfully."
             Write-SystemMessage -msg1 "BitLocker configuration completed." -msg1Color "Green"
         } else {
-            Write-Log "No valid setting for EnableBitlocker. Skipping BitLocker configuration."
-            Write-SystemMessage -msg1 "No valid setting for EnableBitlocker. Skipping BitLocker configuration." -msg1Color "Cyan"
+            Write-Log "No valid setting for EnableBitlocker. Missing configuration."
         }
     } catch {
         Write-ErrorMessage -msg "Error configuring BitLocker: $($_.Exception.Message)"
