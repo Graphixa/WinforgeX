@@ -829,7 +829,6 @@ function Add-RegistryEntries {
 
             Write-Log "Add Registry entries complete."
         } else {
-            Write-SystemMessage -msg1 "No registry entries to add. Missing configuration." -msg1Color "Cyan"
             Write-Log "No registry entries to add. Missing configuration."
         }
     } catch {
@@ -880,7 +879,6 @@ function Remove-RegistryEntries {
 
                 Write-Log "Remove Registry entries complete."
         } else {
-            Write-SystemMessage -msg1 "No registry entries to remove. Missing configuration." -msg1Color "Cyan"
             Write-Log "No registry entries to remove. Missing configuration."
         }
     } catch {
@@ -922,7 +920,7 @@ function Set-PowerSettings {
 function Set-WindowsUpdates {
 
     $setWindowsUpdates = Get-ConfigValue -section "WindowsUpdate"
-    
+
     if (!$setWindowsUpdates) {
         Return
     }
@@ -1117,7 +1115,7 @@ function Set-Services {
             Write-Log "Service configurations applied successfully."
             Write-SuccessMessage
         } else {
-            Write-SystemMessage -msg1 "No services to configure. Missing configuration." -msg1Color "Cyan"
+            Write-Log -msg1 "No services to configure. Missing configuration."
         }
     } catch {
         Write-Log "Error configuring services: $($_.Exception.Message)"
