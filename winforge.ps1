@@ -54,7 +54,7 @@ function Get-ConfigFile {
 
 
 # Function to read INI file
-function Read-IniFile {
+function Read-ConfigFile {
     param (
         [string]$path
     )
@@ -1421,7 +1421,7 @@ if (-not (Test-IsAdmin)) {
 try {
     $configFile = Get-ConfigFile -configFile $configFile
     Write-Log "Loading configuration file: $configFile"
-    $config = Read-IniFile -path $configFile
+    $config = Read-ConfigFile -path $configFile
     Write-Log "Configuration file loaded successfully."
 } catch {
     Write-Log "Error loading configuration file: $($_.Exception.Message)"

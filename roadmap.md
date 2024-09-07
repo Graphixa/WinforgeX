@@ -7,7 +7,8 @@
 
 ### Tweaks
 - Option to bring back old context menu tweak and other tweaks under a tweaks Key
-- Taskbar-Alignment="Centre" or Left
+- Start Menu Taskbar-Alignment="Centre" or Left
+- Start Menu Classic
 - StartMenu-ShowTaskview="False" or true
 - StartMenu-ShowWidgets="False" or True
 
