@@ -785,6 +785,145 @@ function Set-LockScreenImage {
     }
 }
 
+function Set-ThemeSettings {
+    Write-SystemMessage -title "Applying Theme Settings"
+
+    # Set Accent Colour
+    $accentColor = Get-ConfigValue -section "Theme" -key "AccentColor"
+    if ($accentColor) {
+        Write-Log "Setting Accent Color to: $accentColor"
+        Write-SystemMessage -msg1 "- Setting Accent Color to: " -msg2 $accentColor
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemAccentColor" -Value ([convert]::ToInt32($accentColor.Replace('#',''),16)) -PropertyType DWord -Force | Out-Null
+        } catch {
+            Write-Log "Error setting Accent Color: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Accent Color."
+        }
+    } else {
+        Write-Log "Accent Color not set. Missing configuration."
+    }
+
+    # Enable Dark Mode (TRUE or FALSE)
+    $darkMode = Get-ConfigValue -section "Theme" -key "DarkMode"
+    if ($darkMode) {
+        $modeValue = if ($darkMode -eq "TRUE") { 0 } else { 1 }
+        Write-Log "Setting Dark Mode to: $darkMode"
+        Write-SystemMessage -msg1 "- Setting Dark Mode to: " -msg2 $darkMode
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value $modeValue -PropertyType DWord -Force | Out-Null
+        } catch {
+            Write-Log "Error setting Dark Mode: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Dark Mode."
+        }
+    } else {
+        Write-Log "Dark Mode setting not provided. Skipping."
+    }
+
+    # Set Taskbar Position
+    $taskbarPosition = Get-ConfigValue -section "Theme" -key "TaskbarPosition"
+    if ($taskbarPosition) {
+        Write-Log "Setting Taskbar Position to: $taskbarPosition"
+        Write-SystemMessage -msg1 "- Setting Taskbar Position to: " -msg2 $taskbarPosition
+        try {
+            $positionMap = @{
+                "Bottom" = 1
+                "Top"    = 0
+                "Left"   = 3
+                "Right"  = 2
+            }
+            if ($positionMap.ContainsKey($taskbarPosition)) {
+                New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" -Name "Settings" -Value ([byte[]]@($positionMap[$taskbarPosition])) -PropertyType Binary -Force | Out-Null
+                Stop-Process -Name explorer -Force
+                Start-Process explorer
+            } else {
+                Write-Log "Invalid Taskbar Position: $taskbarPosition"
+                Write-ErrorMessage -msg "Invalid Taskbar Position."
+            }
+        } catch {
+            Write-Log "Error setting Taskbar Position: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Taskbar Position."
+        }
+    } else {
+        Write-Log "Taskbar Position not set. Missing configuration."
+    }
+
+    # Set Desktop Icon Size
+    $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
+    if ($desktopIconSize) {
+        Write-Log "Setting Desktop Icon Size to: $desktopIconSize"
+        Write-SystemMessage -msg1 "- Setting Desktop Icon Size to: " -msg2 $desktopIconSize
+        try {
+            $iconSizeMap = @{
+                "Small"  = 48
+                "Medium" = 96
+                "Large"  = 192
+            }
+            if ($iconSizeMap.ContainsKey($desktopIconSize)) {
+                New-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "Shell Icon Size" -Value $iconSizeMap[$desktopIconSize] -PropertyType String -Force | Out-Null
+            } else {
+                Write-Log "Invalid Desktop Icon Size: $desktopIconSize"
+                Write-ErrorMessage -msg "Invalid Desktop Icon Size."
+            }
+        } catch {
+            Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Desktop Icon Size."
+        }
+    } else {
+        Write-Log "Desktop Icon Size not set. Missing configuration."
+    }
+
+    # Set Transparency Effects
+    $transparencyEffects = Get-ConfigValue -section "Theme" -key "TransparencyEffects"
+    if ($transparencyEffects) {
+        $transparencyValue = if ($transparencyEffects -eq "TRUE") { 1 } else { 0 }
+        Write-Log "Setting Transparency Effects to: $transparencyEffects"
+        Write-SystemMessage -msg1 "- Setting Transparency Effects to: " -msg2 $transparencyEffects
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value $transparencyValue -PropertyType DWord -Force | Out-Null
+        } catch {
+            Write-Log "Error setting Transparency Effects: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Transparency Effects."
+        }
+    } else {
+        Write-Log "Transparency Effects not set. Missing configuration."
+    }
+
+    # Set Lock Screen Message
+    $lockScreenMessage = Get-ConfigValue -section "Theme" -key "LockScreenMessage"
+    if ($lockScreenMessage) {
+        Write-Log "Setting Lock Screen Message to: $lockScreenMessage"
+        Write-SystemMessage -msg1 "- Setting Lock Screen Message to: " -msg2 $lockScreenMessage
+        try {
+            New-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\System" -Name "LegalNoticeText" -Value $lockScreenMessage -PropertyType String -Force | Out-Null
+        } catch {
+            Write-Log "Error setting Lock Screen Message: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Lock Screen Message."
+        }
+    } else {
+        Write-Log "Lock Screen Message not set. Missing configuration."
+    }
+
+    # Enable Window Animations
+    $windowAnimations = Get-ConfigValue -section "Theme" -key "WindowAnimations"
+    if ($windowAnimations) {
+        $animationValue = if ($windowAnimations -eq "TRUE") { 1 } else { 0 }
+        Write-Log "Setting Window Animations to: $windowAnimations"
+        Write-SystemMessage -msg1 "- Setting Window Animations to: " -msg2 $windowAnimations
+        try {
+            New-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $animationValue -PropertyType Binary -Force | Out-Null
+        } catch {
+            Write-Log "Error setting Window Animations: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Window Animations."
+        }
+    } else {
+        Write-Log "Window Animations not set. Missing configuration."
+    }
+
+    Write-Log "Theme Settings configuration completed."
+    Write-SuccessMessage -msg "Theme Settings applied successfully."
+}
+
+
 
 # Function to add registry entries
 function Add-RegistryEntries {
@@ -1595,6 +1734,7 @@ Set-PowerSettings
 Set-SystemTimezone
 Set-Wallpaper
 Set-LockScreenImage
+Set-ThemeSettings
 Set-SecuritySettings
 Set-WindowsUpdates
 Set-Services
