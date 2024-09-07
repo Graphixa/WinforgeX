@@ -366,6 +366,7 @@ function Install-WingetApps {
     
     # Only proceed if Winget is the selected package manager
     if ($packageManager -ne "Winget") {
+        Write-Log "Winget is not selected as the package manager. Skipping Winget app installation."
         return
     }
 
