@@ -895,7 +895,12 @@ function Set-Tweaks {
         Write-Log "Restoring Windows 10-style right-click menu."
         Write-SystemMessage -msg1 "- Enabling Windows 10-style right-click menu."
         try {
-            New-ItemProperty -Path "HKCU:\Software\Classes\CLSID" -Name "{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -PropertyType "String" -Force | Out-Null
+            # Create the registry key and set its value
+            New-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -Force | Out-Null
+            New-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Force | Out-Null
+            Set-ItemProperty -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Name "(Default)" -Value "" | Out-Null
+
+            # Restart explorer to apply changes
             Stop-Process -Name explorer -Force
             Start-Process explorer
             Write-SuccessMessage -msg "Classic right-click menu enabled."
@@ -914,8 +919,11 @@ function Set-Tweaks {
         Write-SystemMessage -msg1 "- Enabling God Mode on the desktop."
         try {
             $godModePath = Join-Path -Path ([System.Environment]::GetFolderPath('Desktop')) -ChildPath "GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}"
+            
+            # Create the GodMode folder with the correct name
             New-Item -ItemType Directory -Path $godModePath -Force | Out-Null
             Write-SuccessMessage -msg "God Mode enabled on the desktop."
+
         } catch {
             Write-Log "Error enabling God Mode: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to enable God Mode."
@@ -926,6 +934,7 @@ function Set-Tweaks {
 
     Write-Log "Tweaks configuration completed."
 }
+
 
 
 
