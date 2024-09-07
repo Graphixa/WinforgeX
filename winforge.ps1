@@ -477,7 +477,6 @@ function Install-ChocolateyApps {
             Write-SuccessMessage -msg "Chocolatey apps installed successfully."
         } else {
             Write-Log "No Chocolatey apps provided for installation."
-            Write-SystemMessage -msg1 "No Chocolatey apps provided for installation." -msg1Color "Cyan"
         }
     } catch {
         Write-ErrorMessage -msg "Error in Chocolatey installation process: $($_.Exception.Message)"
@@ -588,7 +587,6 @@ function Install-Fonts {
             Write-SuccessMessage
         } else {
             Write-Log "No fonts to install. Missing configuration."
-            Write-SystemMessage -msg1 "No fonts to install. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error installing fonts: $($_.Exception.Message)"
@@ -672,8 +670,7 @@ function Install-Office {
             Remove-Item $odtFile
             Remove-Item $configurationXMLFile
         } else {
-            Write-Log "Office section not found in configuration file. Skipping Office installation."
-            Write-SystemMessage -msg1 "Office section not found in configuration file. Skipping Office installation." -msg1Color "Yellow"
+            Write-Log "Office configuration not found in configuration file. Skipping Office installation."
         }
     } catch {
         Write-Log "Error installing Microsoft Office: $($_.Exception.Message)"
@@ -727,7 +724,6 @@ function Set-Wallpaper {
             Write-SuccessMessage -msg "Wallpaper set successfully."
         } else {
             Write-Log "Wallpaper not set. Missing configuration."
-            Write-SystemMessage -msg1 "Wallpaper not set. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error setting wallpaper: $($_.Exception.Message)"
@@ -781,7 +777,6 @@ function Set-LockScreenImage {
             Write-SuccessMessage -msg "Lock screen image set successfully."
         } else {
             Write-Log "Lock screen image not set. Missing configuration."
-            Write-SystemMessage -msg1 "Lock screen image not set. Missing configuration." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error setting lock screen image: $($_.Exception.Message)"
@@ -925,6 +920,11 @@ function Set-PowerSettings {
 
 # Function to configure Windows updates
 function Set-WindowsUpdates {
+
+    if (!Get-ConfigValue -section "WindowsUpdate") {
+        Return
+    }
+
     try {
         $noAutoUpdate = Get-ConfigValue -section "WindowsUpdate" -key "NoAutoUpdate"
         $auOptions = Get-ConfigValue -section "WindowsUpdate" -key "AUOptions"
@@ -984,7 +984,6 @@ function Set-WindowsUpdates {
             Write-SystemMessage -msg1 "- Windows updates configured successfully." -msg1Color "Green"
         } else {
             Write-Log "No valid NoAutoUpdate setting provided."
-            Write-SystemMessage -msg1 "No valid NoAutoUpdate setting provided." -msg1Color "Yellow"
         }
     } catch {
         Write-Log "Error configuring Windows updates: $($_.Exception.Message)"
@@ -1116,8 +1115,7 @@ function Set-Services {
             Write-Log "Service configurations applied successfully."
             Write-SuccessMessage
         } else {
-            Write-Log "No services to configure."
-            Write-SystemMessage -msg1 "No services to configure." -msg1Color "Cyan"
+            Write-SystemMessage -msg1 "No services to configure. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-Log "Error configuring services: $($_.Exception.Message)"
@@ -1147,7 +1145,6 @@ function Set-SecuritySettings {
             RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel | Out-Null
             Write-SystemMessage -msg1 "- UAC level set to $uacLevel." -msg1Color "Green"
         } else {
-            Write-ErrorMessage -msg "UAC level not set. Missing configuration."
             Write-Log "UAC level not set. Missing configuration."
         }
 
@@ -1161,8 +1158,7 @@ function Set-SecuritySettings {
             Write-Log "Enabling Windows Telemetry"
             $telemetryValue = 1
         } else {
-            Write-ErrorMessage -msg "Invalid value for DisableTelemetry: $disableTelemetry"
-            Write-Log "Invalid value for DisableTelemetry: $disableTelemetry"
+            Write-Log "Telemetry settings not changed. Missing configuration."
             Return
         }
         $telemetryKeys = @(
@@ -1382,8 +1378,7 @@ function Install-GCPW {
         }
         Write-SuccessMessage -msg "Google Credential Provider for Windows (GCPW) installation completed."
     } else {
-        Write-Log "Skipping Google Credential Provider for Windows (GCPW) installation as per configuration."
-        Write-SystemMessage -msg1 "Skipping Google Credential Provider for Windows (GCPW) installation as per configuration." -msg1Color "Cyan"
+        Write-Log "Skipping Google Credential Provider for Windows (GCPW) installation. Missing configuration."
     }
 }
 
@@ -1391,6 +1386,14 @@ function Install-GCPW {
 
 # Function to install Google Drive
 function Install-GoogleDrive {
+
+    $installGoogleDrive = Get-ConfigValue -section "Google" -key "InstallGoogleDrive"
+
+    if (!$installGoogleDrive){
+        Write-Log "Skipping Google Credential Provider for Windows (GCPW) installation. Missing configuration."
+        return
+    }
+
     $driveFileName = 'GoogleDriveFSSetup.exe'
     $driveUrl = "https://dl.google.com/drive-file-stream/$driveFileName"
 
@@ -1510,7 +1513,6 @@ function Import-Tasks {
             Write-SuccessMessage -msg "Scheduled tasks imported successfully."
         } else {
             Write-Log "No scheduled tasks to import. Missing configuration."
-            Write-SystemMessage -msg1 "No Scheduled tasks to import. Missing configuration." -msg1Color "Cyan"
         }
     } catch {
         Write-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)"
