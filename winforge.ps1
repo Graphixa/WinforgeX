@@ -845,13 +845,6 @@ function Add-RegistryEntries {
 }
 
 
-
-
-
-
-
-
-
 # Function to remove registry entries
 function Remove-RegistryEntries {
     try {
@@ -1000,6 +993,82 @@ function Set-WindowsUpdates {
     }
 }
 
+# Function to manage BitLocker
+function Set-Bitlocker {
+    try {
+        # Get BitLocker settings from the config
+        $enableBitlocker = Get-ConfigValue -section "Security" -key "EnableBitlocker"
+        $bitlockerTarget = Get-ConfigValue -section "Security" -key "BitlockerTarget"
+
+        Write-SystemMessage -title "Configuring BitLocker"
+
+        if ($enableBitlocker -eq "TRUE") {
+            Write-Log "Enabling BitLocker on target: $bitlockerTarget"
+
+            # Determine the target drive(s)
+            if ($bitlockerTarget -eq "All") {
+                Write-SystemMessage -msg1 "- Enabling BitLocker on all drives..."
+                Get-WmiObject -Query "SELECT * FROM Win32_LogicalDisk WHERE DriveType=3" | ForEach-Object {
+                    $driveLetter = $_.DeviceID
+                    Write-Log "Enabling BitLocker on drive $driveLetter"
+                    Enable-BitLocker -MountPoint $driveLetter -EncryptionMethod XtsAes256 -UsedSpaceOnly -TpmProtector -SkipHardwareTest -ErrorAction Stop
+                    Write-SystemMessage -msg1 "- BitLocker enabled on drive: " -msg2 "$driveLetter" -msg1Color "Green"
+                }
+            } elseif ($bitlockerTarget -eq "SystemDrive") {
+                Write-Log "Enabling BitLocker on System Drive"
+                Enable-BitLocker -MountPoint $env:SystemDrive -EncryptionMethod XtsAes256 -UsedSpaceOnly -TpmProtector -SkipHardwareTest -ErrorAction Stop
+                Write-SystemMessage -msg1 "- BitLocker enabled on System Drive." -msg1Color "Green"
+            } elseif ($bitlockerTarget -match "^[A-Z]:\\$") {
+                Write-Log "Enabling BitLocker on specified drive: $bitlockerTarget"
+                Enable-BitLocker -MountPoint $bitlockerTarget -EncryptionMethod XtsAes256 -UsedSpaceOnly -TpmProtector -SkipHardwareTest -ErrorAction Stop
+                Write-SystemMessage -msg1 "- BitLocker enabled on drive: " -msg2 "$bitlockerTarget" -msg1Color "Green"
+            } else {
+                Write-Log "Invalid BitLocker target specified."
+                Write-ErrorMessage -msg "Invalid BitLocker target specified: $bitlockerTarget"
+                Return
+            }
+
+            Write-Log "BitLocker enabled successfully."
+            Write-SystemMessage -msg1 "BitLocker configuration completed." -msg1Color "Green"
+        } elseif ($enableBitlocker -eq "FALSE") {
+            Write-Log "Disabling BitLocker on target: $bitlockerTarget"
+
+            # Determine the target drive(s) to disable BitLocker
+            if ($bitlockerTarget -eq "All") {
+                Write-SystemMessage -msg1 "- Disabling BitLocker on all drives..."
+                Get-WmiObject -Query "SELECT * FROM Win32_LogicalDisk WHERE DriveType=3" | ForEach-Object {
+                    $driveLetter = $_.DeviceID
+                    Write-Log "Disabling BitLocker on drive $driveLetter"
+                    Disable-BitLocker -MountPoint $driveLetter -ErrorAction Stop
+                    Write-SystemMessage -msg1 "- BitLocker disabled on drive: " -msg2 "$driveLetter" -msg1Color "Green"
+                }
+            } elseif ($bitlockerTarget -eq "SystemDrive") {
+                Write-Log "Disabling BitLocker on System Drive"
+                Disable-BitLocker -MountPoint $env:SystemDrive -ErrorAction Stop
+                Write-SystemMessage -msg1 "- BitLocker disabled on System Drive." -msg1Color "Green"
+            } elseif ($bitlockerTarget -match "^[A-Z]:\\$") {
+                Write-Log "Disabling BitLocker on specified drive: $bitlockerTarget"
+                Disable-BitLocker -MountPoint $bitlockerTarget -ErrorAction Stop
+                Write-SystemMessage -msg1 "- BitLocker disabled on drive: " -msg2 "$bitlockerTarget" -msg1Color "Green"
+            } else {
+                Write-Log "Invalid BitLocker target specified."
+                Write-ErrorMessage -msg "Invalid BitLocker target specified: $bitlockerTarget"
+                Return
+            }
+
+            Write-Log "BitLocker disabled successfully."
+            Write-SystemMessage -msg1 "BitLocker configuration completed." -msg1Color "Green"
+        } else {
+            Write-Log "No valid setting for EnableBitlocker. Skipping BitLocker configuration."
+            Write-SystemMessage -msg1 "No valid setting for EnableBitlocker. Skipping BitLocker configuration." -msg1Color "Cyan"
+        }
+    } catch {
+        Write-ErrorMessage -msg "Error configuring BitLocker: $($_.Exception.Message)"
+        Write-Log "Error configuring BitLocker: $($_.Exception.Message)"
+        Return
+    }
+}
+
 
 
 # Function to set optional windows features and services
@@ -1062,11 +1131,11 @@ function Set-Services {
 # Function to configure security settings
 function Set-SecuritySettings {
     try {
-        $uacLevel = Get-ConfigValue -section "SecuritySettings" -key "UACLevel"
-        $disableTelemetry = Get-ConfigValue -section "SecuritySettings" -key "DisableTelemetry"
-        $showFileExtensions = Get-ConfigValue -section "SecuritySettings" -key "ShowFileExtensions"
-        $disableCopilot = Get-ConfigValue -section "SecuritySettings" -key "DisableCopilot"
-        $disableOneDrive = Get-ConfigValue -section "SecuritySettings" -key "DisableOneDrive"
+        $uacLevel = Get-ConfigValue -section "Security" -key "UACLevel"
+        $disableTelemetry = Get-ConfigValue -section "Security" -key "DisableTelemetry"
+        $showFileExtensions = Get-ConfigValue -section "Security" -key "ShowFileExtensions"
+        $disableCopilot = Get-ConfigValue -section "Security" -key "DisableCopilot"
+        $disableOneDrive = Get-ConfigValue -section "Security" -key "DisableOneDrive"
 
         Write-Log "Configuring Security Settings"
         Write-SystemMessage -title "Configuring Security Settings"
