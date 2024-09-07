@@ -832,8 +832,8 @@ function Set-ThemeSettings {
         # Switch based on the size selected
         switch ($desktopIconSize) {
             "Small" { $iconSizeValue = 32 }
-            "Medium" { $iconSizeValue = 64 }
-            "Large" { $iconSizeValue = 96 }
+            "Medium" { $iconSizeValue = 48 }
+            "Large" { $iconSizeValue = 64 }
             default { 
                 Write-Log "Invalid Desktop Icon Size specified: $desktopIconSize. Skipping."
                 return
