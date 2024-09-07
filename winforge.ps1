@@ -857,25 +857,6 @@ function Set-ThemeSettings {
         Write-Log "Lock Screen Message not set. Missing configuration."
     }
 
-    # Enable Window Animations
-    $windowAnimations = Get-ConfigValue -section "Theme" -key "WindowAnimations"
-    if ($windowAnimations) {
-        $animationValue = if ($windowAnimations -eq "TRUE") { 1 } else { 0 }
-        Write-Log "Setting Window Animations to: $windowAnimations"
-        Write-SystemMessage -msg1 "- Setting Window Animations to: " -msg2 $windowAnimations
-        try {
-            # Adjust the UserPreferencesMask for enabling/disabling window animations
-            $currentMask = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask").UserPreferencesMask
-            $updatedMask = if ($windowAnimations -eq "TRUE") { $currentMask -bor 0x20 } else { $currentMask -band 0xDF }
-            Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $updatedMask -ErrorAction Stop
-        } catch {
-            Write-Log "Error setting Window Animations: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Failed to set Window Animations."
-        }
-    } else {
-        Write-Log "Window Animations not set. Missing configuration."
-    }
-
     # Set Desktop Icon Size
     $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
     if ($desktopIconSize) {
@@ -884,9 +865,9 @@ function Set-ThemeSettings {
         
         # Switch based on the size selected
         switch ($desktopIconSize) {
-            "Small" { $iconSizeValue = 16 }
-            "Medium" { $iconSizeValue = 32 }
-            "Large" { $iconSizeValue = 48 }
+            "Small" { $iconSizeValue = 32 }
+            "Medium" { $iconSizeValue = 64 }
+            "Large" { $iconSizeValue = 96 }
             default { 
                 Write-Log "Invalid Desktop Icon Size specified: $desktopIconSize. Skipping."
                 return
@@ -897,9 +878,6 @@ function Set-ThemeSettings {
             # Apply icon size in the correct registry path
             New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -Name "IconSize" -Value $iconSizeValue -PropertyType DWord -Force | Out-Null
             Write-Log "Desktop Icon Size set to $desktopIconSize ($iconSizeValue)."
-            # Restart explorer to apply changes
-            Stop-Process -Name explorer -Force
-            Start-Process explorer
         } catch {
             Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to set Desktop Icon Size."
@@ -907,6 +885,11 @@ function Set-ThemeSettings {
     } else {
         Write-Log "Desktop Icon Size not set. Missing configuration."
     }
+    
+    # Restart Explorer for settings to take effect
+    Stop-Process -Name explorer
+    Start-Sleep -Seconds 5
+    if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
 
     Write-Log "Theme Settings configuration completed."
     Write-SuccessMessage -msg "Theme Settings applied successfully."
