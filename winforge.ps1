@@ -1589,25 +1589,26 @@ try {
 Clear-Host
 Set-SystemCheckpoint
 Set-ComputerName
+Set-EnvironmentVariables
 Set-Locale
+Set-PowerSettings
 Set-SystemTimezone
 Set-Wallpaper
 Set-LockScreenImage
+Set-SecuritySettings
+Set-WindowsUpdates
+Set-Services
+Set-Bitlocker
+Install-Fonts
 Install-WingetApps 
 Install-ChocolateyApps
-Install-Office
-Add-RegistryEntries
-Remove-RegistryEntries
-Set-PowerSettings
-Set-WindowsUpdates
-Set-SecuritySettings
-Set-Services
-Set-EnvironmentVariables
-Import-Tasks
-Install-Fonts
 Install-GCPW
 Install-ChromeEnterprise
 Install-GoogleDrive
+Install-Office
+Add-RegistryEntries
+Remove-RegistryEntries
+Import-Tasks
 Activate-Windows
 
 
