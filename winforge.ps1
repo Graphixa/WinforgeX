@@ -359,11 +359,19 @@ function Test-ProgramInstalled {
 }
 
 # Function to install applications via winget using manifest files
-function Install-Applications {
+function Install-WingetApps {
+    $packageManager = Get-ConfigValue -section "Applications" -key "PackageManager"
+    
+    # Only proceed if Winget is the selected package manager
+    if ($packageManager -ne "Winget") {
+        Write-Log "Winget is not selected as the package manager. Skipping Winget app installation."
+        return
+    }
 
     $appManifestFile = Get-ConfigValue -section "Applications" -key "WingetAppManifest"
+    
     if ($appManifestFile) {
-        Write-SystemMessage -title "Installing Applications"
+        Write-SystemMessage -title "Installing Winget Applications"
         Write-Log "Installing applications via winget import"
 
         # Download the manifest file if it's a URL
@@ -414,8 +422,84 @@ function Install-Applications {
         Write-SuccessMessage -msg "Applications installed successfully."
         
     } else {
-        Write-Log "No app manifest file provided."
-        Write-SystemMessage -msg1 "No app manifest file provided." -msg1Color "Cyan"
+        Write-Log "No app manifest file provided for Winget."
+        Write-SystemMessage -msg1 "No app manifest file provided for Winget." -msg1Color "Cyan"
+    }
+}
+
+
+# Function to install Chocolatey and Chocolatey Apps
+function Install-ChocolateyApps {
+    $packageManager = Get-ConfigValue -section "Applications" -key "PackageManager"
+
+    # Only proceed if Chocolatey is the selected package manager
+    if ($packageManager -ne "Chocolatey") {
+        Write-Log "Chocolatey is not selected as the package manager. Skipping Chocolatey app installation."
+        return
+    }
+
+    try {
+        $chocoApps = Get-ConfigValue -section "Applications" -key "ChocolateyApps"
+        
+        if ($chocoApps) {
+            Write-SystemMessage -title "Installing Chocolatey and Apps"
+            Write-Log "ChocolateyApps setting found. Checking if Chocolatey is installed."
+
+            # Check if Chocolatey is installed
+            if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+                Write-SystemMessage -msg1 "- Chocolatey is not installed. Installing Chocolatey."
+                Write-Log "Chocolatey is not installed. Installing..."
+                
+                # Install Chocolatey
+                Set-ExecutionPolicy Bypass -Scope Process -Force;
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
+                Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+                if (Get-Command choco -ErrorAction SilentlyContinue) {
+                    Write-SystemMessage -msg1 "- Chocolatey installed successfully." -msg1Color "Green"
+                    Write-Log "Chocolatey installed successfully."
+                } else {
+                    Write-ErrorMessage -msg "Failed to install Chocolatey."
+                    Write-Log "Error: Chocolatey installation failed."
+                    return
+                }
+            } else {
+                Write-SystemMessage -msg1 "- Chocolatey is already installed." -msg1Color "Cyan"
+                Write-Log "Chocolatey is already installed. Skipping installation."
+            }
+
+            # Split the ChocolateyApps string and install each app
+            $appList = $chocoApps -split ',' | ForEach-Object { $_.Trim() }
+            
+            foreach ($app in $appList) {
+                if (-not (choco list --local-only | Select-String -Pattern $app)) {
+                    Write-SystemMessage -msg1 "- Installing: " -msg2 $app
+                    Write-Log "Installing $app via Chocolatey"
+                    
+                    # Install the app via Chocolatey
+                    try {
+                        choco install $app -y --ignore-checksums
+                        Write-SystemMessage -msg1 "- $app installed successfully." -msg1Color "Green"
+                        Write-Log "$app installed successfully."
+                    } catch {
+                        Write-ErrorMessage -msg "Error installing $app. $($_.Exception.Message)"
+                        Write-Log "Error installing ${app}: $($_.Exception.Message)"
+                    }
+                } else {
+                    Write-SystemMessage -msg1 "- $app is already installed. Skipping." -msg1Color "Cyan"
+                    Write-Log "$app is already installed. Skipping."
+                }
+            }
+
+            Write-SuccessMessage -msg "Chocolatey apps installed successfully."
+        } else {
+            Write-Log "No ChocolateyApps setting found. Skipping Chocolatey installation."
+            Write-SystemMessage -msg1 "No ChocolateyApps setting found. Skipping installation." -msg1Color "Cyan"
+        }
+    } catch {
+        Write-ErrorMessage -msg "Error in Chocolatey installation process: $($_.Exception.Message)"
+        Write-Log "Error installing Chocolatey apps: $($_.Exception.Message)"
+        Return
     }
 }
 
@@ -1429,6 +1513,7 @@ try {
 }
 
 # Execute functions
+# Main script execution
 Clear-Host
 Set-SystemCheckpoint
 Set-ComputerName
@@ -1436,7 +1521,8 @@ Set-Locale
 Set-SystemTimezone
 Set-Wallpaper
 Set-LockScreenImage
-Install-Applications
+Install-WingetApps 
+Install-ChocolateyApps
 Install-Office
 Add-RegistryEntries
 Remove-RegistryEntries
@@ -1451,6 +1537,7 @@ Install-GCPW
 Install-ChromeEnterprise
 Install-GoogleDrive
 Activate-Windows
+
 
 # Remove the configuration file if it was downloaded
 if ($configFile -match [regex]::Escape("$env:TEMP\config.ini")) {
