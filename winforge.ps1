@@ -886,6 +886,46 @@ function Set-ThemeSettings {
     Write-SuccessMessage -msg "Theme Settings applied successfully."
 }
 
+function Set-Tweaks {
+    Write-SystemMessage -title "Applying Tweaks"
+
+    # Enable Classic Right-Click Menu (Windows 10 Style)
+    $classicRightClickMenu = Get-ConfigValue -section "Tweaks" -key "ClassicRightClickMenu"
+    if ($classicRightClickMenu -eq "TRUE") {
+        Write-Log "Restoring Windows 10-style right-click menu."
+        Write-SystemMessage -msg1 "- Enabling Windows 10-style right-click menu."
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Classes\CLSID" -Name "{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -PropertyType "String" -Force | Out-Null
+            Stop-Process -Name explorer -Force
+            Start-Process explorer
+            Write-SuccessMessage -msg "Classic right-click menu enabled."
+        } catch {
+            Write-Log "Error restoring classic right-click menu: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to restore classic right-click menu."
+        }
+    } else {
+        Write-Log "Classic right-click menu not enabled. Skipping."
+    }
+
+    # Enable God Mode on the Desktop
+    $enableGodMode = Get-ConfigValue -section "Tweaks" -key "EnableGodMode"
+    if ($enableGodMode -eq "TRUE") {
+        Write-Log "Enabling God Mode on the desktop."
+        Write-SystemMessage -msg1 "- Enabling God Mode on the desktop."
+        try {
+            $godModePath = Join-Path -Path ([System.Environment]::GetFolderPath('Desktop')) -ChildPath "GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}"
+            New-Item -ItemType Directory -Path $godModePath -Force | Out-Null
+            Write-SuccessMessage -msg "God Mode enabled on the desktop."
+        } catch {
+            Write-Log "Error enabling God Mode: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to enable God Mode."
+        }
+    } else {
+        Write-Log "God Mode not enabled. Skipping."
+    }
+
+    Write-Log "Tweaks configuration completed."
+}
 
 
 
@@ -1695,6 +1735,7 @@ Set-EnvironmentVariables
 Set-Locale
 Set-PowerSettings
 Set-SystemTimezone
+Set-Tweaks
 Set-Wallpaper
 Set-LockScreenImage
 Set-ThemeSettings
