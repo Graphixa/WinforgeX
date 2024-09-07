@@ -921,7 +921,9 @@ function Set-PowerSettings {
 # Function to configure Windows updates
 function Set-WindowsUpdates {
 
-    if (!Get-ConfigValue -section "WindowsUpdate") {
+    $setWindowsUpdates = Get-ConfigValue -section "WindowsUpdate"
+    
+    if (!$setWindowsUpdates) {
         Return
     }
 
