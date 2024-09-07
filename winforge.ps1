@@ -273,8 +273,10 @@ function Set-SystemCheckpoint {
 
 # Function to set computer name
 function Set-ComputerName {
+
     try {
         $computerName = Get-ConfigValue -section "System" -key "ComputerName"
+        
         if ($computerName) {
             Write-Log "Setting computer name to: $computerName"
             Rename-Computer -NewName $computerName -Force
@@ -364,7 +366,6 @@ function Install-WingetApps {
     
     # Only proceed if Winget is the selected package manager
     if ($packageManager -ne "Winget") {
-        Write-Log "Winget is not selected as the package manager. Skipping Winget app installation."
         return
     }
 
