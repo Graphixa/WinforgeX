@@ -822,6 +822,31 @@ function Set-ThemeSettings {
         Write-Log "Transparency Effects not set. Missing configuration."
     }
 
+    # Set Taskbar Alignment (Left or Center)
+    $taskbarAlignment = Get-ConfigValue -section "Theme" -key "TaskbarAlignment"
+    if ($taskbarAlignment) {
+        Write-Log "Setting Taskbar Alignment to: $taskbarAlignment"
+        Write-SystemMessage -msg1 "- Setting Taskbar Alignment to: " -msg2 $taskbarAlignment
+        try {
+            switch ($taskbarAlignment) {
+                "Left"   { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force }
+                "Center" { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 1 -Force }
+                default {
+                    Write-Log "Invalid Taskbar Alignment: $taskbarAlignment. Skipping."
+                    return
+                }
+            }
+            Write-Log "Taskbar Alignment set to $taskbarAlignment."
+            # Restart explorer to apply the changes
+            Stop-Process -Name explorer -Force
+            Start-Process explorer
+        } catch {
+            Write-Log "Error setting Taskbar Alignment: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Taskbar Alignment."
+        }
+    } else {
+        Write-Log "Taskbar Alignment not set. Missing configuration."
+    }
 
     # Set Desktop Icon Size
     $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
