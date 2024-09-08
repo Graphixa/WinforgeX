@@ -1826,7 +1826,7 @@ function Import-Tasks {
                     Register-ScheduledTask -TaskName $key -Xml (Get-Content $tempTaskFile | Out-String) -Force | Out-Null
 
                     Write-SuccessMessage -msg "Task $key imported successfully."
-                    Write-Log "Task $key imported successfully."
+                    Write-Log "Task $fileName imported successfully."
                 }
                 catch {
                     Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
