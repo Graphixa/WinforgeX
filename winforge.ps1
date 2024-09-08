@@ -342,6 +342,68 @@ function Set-SystemTimezone {
     }
 }
 
+# Function to disable OneDrive
+function Set-DisableOneDrive {
+    try {
+        $disableOneDrive = Get-ConfigValue -section "System" -key "DisableOneDrive"
+        
+        if ($disableOneDrive -eq "TRUE") {
+            Write-Log "Disabling OneDrive."
+            Write-SystemMessage -msg1 "- Disabling OneDrive."
+            try {
+                # Registry changes to disable OneDrive
+                New-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1 -PropertyType DWord -Force | Out-Null
+                Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
+                
+                Write-SuccessMessage -msg "OneDrive disabled."
+                Write-Log "OneDrive disabled successfully."
+            } catch {
+                Write-Log "Error disabling OneDrive: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to disable OneDrive."
+            }
+        } elseif ($disableOneDrive -eq "FALSE") {
+            Write-Log "Enable OneDrive selected, skipping OneDrive disable."
+            Write-SystemMessage -msg1 "- OneDrive remains enabled."
+        } else {
+            Write-Log "Disable OneDrive not set or invalid value. Skipping."
+        }
+    } catch {
+        Write-Log "Error in Set-DisableOneDrive function: $($_.Exception.Message)"
+        Return
+    }
+}
+
+# Function to disable Windows Copilot
+function Set-DisableCopilot {
+    try {
+        $disableCopilot = Get-ConfigValue -section "System" -key "DisableCopilot"
+        
+        if ($disableCopilot -eq "TRUE") {
+            Write-Log "Disabling Windows Copilot."
+            Write-SystemMessage -msg1 "- Disabling Windows Copilot."
+            try {
+                # Registry changes to disable Copilot
+                New-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "CopilotEnabled" -Value 0 -PropertyType DWord -Force | Out-Null
+                
+                Write-SuccessMessage -msg "Windows Copilot disabled."
+                Write-Log "Windows Copilot disabled successfully."
+            } catch {
+                Write-Log "Error disabling Windows Copilot: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to disable Windows Copilot."
+            }
+        } elseif ($disableCopilot -eq "FALSE") {
+            Write-Log "Enable Copilot selected, skipping Copilot disable."
+            Write-SystemMessage -msg1 "- Windows Copilot remains enabled."
+        } else {
+            Write-Log "Disable Copilot not set or invalid value. Skipping."
+        }
+    } catch {
+        Write-Log "Error in Set-DisableCopilot function: $($_.Exception.Message)"
+        Return
+    }
+}
+
+
 # Function to test if a program is installed
 function Test-ProgramInstalled {
     param(
@@ -1865,6 +1927,8 @@ Set-SystemCheckpoint
 Set-ComputerName
 Set-EnvironmentVariables
 Set-Locale
+Set-DisableOneDrive
+Set-DisableCopilot
 Set-PowerSettings
 Set-SystemTimezone
 Set-TaskbarFeatures
