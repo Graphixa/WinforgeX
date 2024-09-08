@@ -1809,13 +1809,12 @@ function Install-GoogleDrive {
     }
 }
 
-# Function to import tasks into Task Scheduler
+# Function to import tasks using Register-ScheduledTask
 function Import-Tasks {
     try {
         $tasksSection = $config["Tasks"]
         if ($tasksSection) {
             Write-SystemMessage -title "Importing Scheduled Tasks"
-
             foreach ($key in $tasksSection.Keys) {
                 $taskFile = $tasksSection[$key]
 
@@ -1824,23 +1823,20 @@ function Import-Tasks {
                     Write-SystemMessage -msg1 "- Checking remote folder: " -msg2 $taskFile
                     Write-Log "Checking remote folder: $taskFile"
 
-                    # Validate if the URL exists
                     try {
+                        # Validate if the URL exists
                         $response = Invoke-WebRequest -Uri $taskFile -Method Head -ErrorAction Stop
                         if ($response.StatusCode -eq 200) {
                             Write-Log "Folder exists. Proceeding with download."
                             Write-SystemMessage -msg1 "- Remote folder exists. Proceeding with download." -msg1Color "Green"
 
-                            # Proceed to download tasks from the folder
                             $tempFolder = "$env:TEMP\Tasks"
                             if (-not (Test-Path $tempFolder)) {
                                 New-Item -ItemType Directory -Path $tempFolder | Out-Null
                             }
 
-                            # Example logic to download and import tasks
-                            $webRequest = Invoke-WebRequest -Uri $taskFile
-                            $xmlFiles = $webRequest.Links | Where-Object { $_.href -match '\.xml$' }
-                            
+                            $xmlFiles = (Invoke-WebRequest -Uri $taskFile).Links | Where-Object { $_.href -match '\.xml$' }
+
                             foreach ($xmlFile in $xmlFiles) {
                                 $fileName = [System.IO.Path]::GetFileName($xmlFile.href)
                                 $fileUrl = "$taskFile$fileName"
@@ -1850,11 +1846,16 @@ function Import-Tasks {
                                 Write-Log "Downloading task file: $fileUrl"
                                 Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
 
-                                # Import the task
-                                Write-SystemMessage -msg1 "- Importing task: " -msg2 $downloadedFile
-                                Write-Log "Importing task: $downloadedFile"
-                                schtasks /create /tn "$key-$fileName" /xml $downloadedFile /f
-                                Write-SystemMessage -msg1 "- Task $fileName imported successfully." -msg1Color "Green"
+                                # Import the task using Register-ScheduledTask
+                                try {
+                                    $taskName = "$key-$fileName"
+                                    Register-ScheduledTask -TaskName $taskName -Xml (Get-Content $downloadedFile | Out-String) -Force
+                                    Write-SystemMessage -msg1 "- Task $taskName imported successfully." -msg1Color "Green"
+                                    Write-Log "Task $taskName imported successfully."
+                                } catch {
+                                    Write-Log "Failed to register task ${taskName}: $($_.Exception.Message)"
+                                    Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
+                                }
                             }
                         } else {
                             throw "Invalid response code $($response.StatusCode)"
@@ -1862,9 +1863,8 @@ function Import-Tasks {
                     } catch {
                         Write-ErrorMessage -msg "The remote folder does not exist or is inaccessible: $taskFile"
                         Write-Log "Error: The remote folder does not exist or is inaccessible: $($_.Exception.Message)"
-                        Return
+                        return
                     }
-
                 } else {
                     # Handle individual task files
                     try {
@@ -1881,15 +1881,15 @@ function Import-Tasks {
                             throw "Invalid response code $($response.StatusCode)"
                         }
 
-                        # Import the task into Task Scheduler
+                        # Import the task using Register-ScheduledTask
                         Write-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
                         Write-Log "Importing task: $taskFile"
-                        schtasks /create /tn $key /xml $taskFile /f
+                        Register-ScheduledTask -TaskName $key -Xml (Get-Content $taskFile | Out-String) -Force
                         Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
                     } catch {
                         Write-ErrorMessage -msg "The task file does not exist or is inaccessible: $taskFile"
                         Write-Log "Error: The task file does not exist or is inaccessible: $($_.Exception.Message)"
-                        Return
+                        return
                     }
                 }
             }
@@ -1901,9 +1901,10 @@ function Import-Tasks {
     } catch {
         Write-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)"
         Write-Log "Error importing tasks: $($_.Exception.Message)"
-        Return
+        return
     }
 }
+
 
 # Function to activate Windows
 function Activate-Windows {
