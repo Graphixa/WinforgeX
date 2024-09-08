@@ -520,7 +520,6 @@ function Install-ChocolateyApps {
                 # Use double quotes around app name to avoid issues with special characters
                 try {
                     Start-Process -NoNewWindow -Wait -FilePath "choco" -ArgumentList "install `"$app`" -y" -ErrorAction Stop
-                    Start-Process -Wait -FilePath "choco" -ArgumentList "install `"$app`" -y" -ErrorAction Stop
                     Write-Log "$app installed successfully."
                     Write-SystemMessage -msg1 "$app installed successfully." -msg1Color "Green"
                 } catch {
@@ -1533,20 +1532,17 @@ function Set-SecuritySettings {
     Write-SuccessMessage -msg "Security settings configured successfully."
 }
 
-# Function to manage BitLocker
+# Function to manage BitLocker with a check for existing encryption
 function Set-Bitlocker {
 
-    # Get BitLocker settings from the config
     $enableBitlocker = Get-ConfigValue -section "Security" -key "EnableBitlocker"
     $bitlockerTarget = Get-ConfigValue -section "Security" -key "BitlockerTarget"
 
-    # Guard clause for EnableBitlocker setting
     if (-not $enableBitlocker) {
         Write-Log "EnableBitlocker not set. Skipping BitLocker configuration."
         return
     }
 
-    # Guard clause for BitlockerTarget setting
     if (-not $bitlockerTarget) {
         Write-Log "BitlockerTarget not set. Skipping BitLocker configuration."
         return
@@ -1556,70 +1552,36 @@ function Set-Bitlocker {
         Write-SystemMessage -title "Configuring BitLocker"
 
         if ($enableBitlocker -eq "TRUE") {
-            Write-Log "Enabling BitLocker on target: $bitlockerTarget"
+            $bitlockerStatus = Get-BitLockerVolume -MountPoint $bitlockerTarget
 
-            # Determine the target drive(s)
-            if ($bitlockerTarget -eq "All") {
-                Write-SystemMessage -msg1 "- Enabling BitLocker on all drives..."
-                Get-WmiObject -Query "SELECT * FROM Win32_LogicalDisk WHERE DriveType=3" | ForEach-Object {
-                    $driveLetter = $_.DeviceID
-                    Write-Log "Enabling BitLocker on drive $driveLetter"
-                    Enable-BitLocker -MountPoint $driveLetter -EncryptionMethod XtsAes256 -UsedSpaceOnly -TpmProtector -SkipHardwareTest -ErrorAction Stop
-                    Write-SystemMessage -msg1 "- BitLocker enabled on drive: " -msg2 "$driveLetter" -msg1Color "Green"
-                }
-            } elseif ($bitlockerTarget -eq "SystemDrive") {
-                Write-Log "Enabling BitLocker on System Drive"
-                Enable-BitLocker -MountPoint $env:SystemDrive -EncryptionMethod XtsAes256 -UsedSpaceOnly -TpmProtector -SkipHardwareTest -ErrorAction Stop
-                Write-SystemMessage -msg1 "- BitLocker enabled on System Drive." -msg1Color "Green"
-            } elseif ($bitlockerTarget -match "^[A-Z]:\\$") {
-                Write-Log "Enabling BitLocker on specified drive: $bitlockerTarget"
+            if ($bitlockerStatus.ProtectionStatus -eq 'On') {
+                Write-Log "BitLocker is already enabled on $bitlockerTarget. Skipping."
+                Write-SystemMessage -msg1 "- BitLocker already enabled on $bitlockerTarget. Skipping." -msg1Color "Green"
+            } else {
+                Write-Log "Enabling BitLocker on $bitlockerTarget"
                 Enable-BitLocker -MountPoint $bitlockerTarget -EncryptionMethod XtsAes256 -UsedSpaceOnly -TpmProtector -SkipHardwareTest -ErrorAction Stop
-                Write-SystemMessage -msg1 "- BitLocker enabled on drive: " -msg2 "$bitlockerTarget" -msg1Color "Green"
-            } else {
-                Write-Log "Invalid BitLocker target specified."
-                Write-ErrorMessage -msg "Invalid BitLocker target specified: $bitlockerTarget"
-                Return
+                Write-SystemMessage -msg1 "- BitLocker enabled on $bitlockerTarget." -msg1Color "Green"
             }
 
-            Write-Log "BitLocker enabled successfully."
-            Write-SystemMessage -msg1 "BitLocker configuration completed." -msg1Color "Green"
         } elseif ($enableBitlocker -eq "FALSE") {
-            Write-Log "Disabling BitLocker on target: $bitlockerTarget"
-
-            # Determine the target drive(s) to disable BitLocker
-            if ($bitlockerTarget -eq "All") {
-                Write-SystemMessage -msg1 "- Disabling BitLocker on all drives..."
-                Get-WmiObject -Query "SELECT * FROM Win32_LogicalDisk WHERE DriveType=3" | ForEach-Object {
-                    $driveLetter = $_.DeviceID
-                    Write-Log "Disabling BitLocker on drive $driveLetter"
-                    Disable-BitLocker -MountPoint $driveLetter -ErrorAction Stop
-                    Write-SystemMessage -msg1 "- BitLocker disabled on drive: " -msg2 "$driveLetter" -msg1Color "Green"
-                }
-            } elseif ($bitlockerTarget -eq "SystemDrive") {
-                Write-Log "Disabling BitLocker on System Drive"
-                Disable-BitLocker -MountPoint $env:SystemDrive -ErrorAction Stop
-                Write-SystemMessage -msg1 "- BitLocker disabled on System Drive." -msg1Color "Green"
-            } elseif ($bitlockerTarget -match "^[A-Z]:\\$") {
-                Write-Log "Disabling BitLocker on specified drive: $bitlockerTarget"
-                Disable-BitLocker -MountPoint $bitlockerTarget -ErrorAction Stop
-                Write-SystemMessage -msg1 "- BitLocker disabled on drive: " -msg2 "$bitlockerTarget" -msg1Color "Green"
+            $bitlockerStatus = Get-BitLockerVolume -MountPoint $bitlockerTarget
+            if ($bitlockerStatus.ProtectionStatus -eq 'Off') {
+                Write-Log "BitLocker is already disabled on $bitlockerTarget. Skipping."
+                Write-SystemMessage -msg1 "- BitLocker already disabled on $bitlockerTarget. Skipping." -msg1Color "Green"
             } else {
-                Write-Log "Invalid BitLocker target specified."
-                Write-ErrorMessage -msg "Invalid BitLocker target specified: $bitlockerTarget"
-                Return
+                Write-Log "Disabling BitLocker on $bitlockerTarget"
+                Disable-BitLocker -MountPoint $bitlockerTarget -ErrorAction Stop
+                Write-SystemMessage -msg1 "- BitLocker disabled on $bitlockerTarget." -msg1Color "Green"
             }
-
-            Write-Log "BitLocker disabled successfully."
-            Write-SystemMessage -msg1 "BitLocker configuration completed." -msg1Color "Green"
-        } else {
-            Write-Log "No valid setting for EnableBitlocker. Missing configuration."
         }
+
     } catch {
         Write-ErrorMessage -msg "Error configuring BitLocker: $($_.Exception.Message)"
         Write-Log "Error configuring BitLocker: $($_.Exception.Message)"
-        Return
+        return
     }
 }
+
 
 # Function to set environment variables
 function Set-EnvironmentVariables {
