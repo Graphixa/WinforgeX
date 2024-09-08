@@ -177,11 +177,11 @@ function Write-SuccessMessage {
       $msg = "COMPLETE",
   
       [Parameter()]
-      $msgColor = 'White'
+      $msgColor = 'Green'
     )
   
     Write-Host
-    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor DarkGreen
+    Write-Host " $msg ".ToUpper() -ForegroundColor $msgColor -BackgroundColor Black
     Write-Host
   }
 
