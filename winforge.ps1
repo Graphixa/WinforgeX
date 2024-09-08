@@ -127,7 +127,7 @@ function Write-SystemMessage {
         $titleColor = 'DarkMagenta',
   
         [Parameter()]
-        $msg1Color = 'DarkYellow',
+        $msg1Color = 'Cyan',
 
         [Parameter()]
         $msg2color = 'White'
@@ -165,7 +165,7 @@ function Write-ErrorMessage {
     )
   
     Write-Host
-    Write-Host " $msg ".ToUpper() -ForegroundColor $color -BackgroundColor Red
+    Write-Host " $msg ".ToUpper() -ForegroundColor $color -BackgroundColor DarkRed
     Write-Host
     Write-Host $_.Exception.Message -ForegroundColor Red
     Write-Host
@@ -181,7 +181,7 @@ function Write-SuccessMessage {
     )
   
     Write-Host
-    Write-Host " $msg ".ToUpper() -ForegroundColor $msgColor -BackgroundColor Black
+    Write-Host "> $msg ".ToUpper() -ForegroundColor $msgColor -BackgroundColor Black
     Write-Host
   }
 
