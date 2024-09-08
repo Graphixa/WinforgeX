@@ -1836,7 +1836,7 @@ function Import-Tasks {
     }
 }
 
-# Function to bulk import tasks repository from github repository or zip file online
+# Function to bulk import tasks repository from GitHub repository or ZIP file online
 function Import-TaskRepository {
     try {
         # Check if "Tasks" section and "TaskRepository" key is present in the configuration
@@ -1861,12 +1861,11 @@ function Import-TaskRepository {
             Write-Log "Detected GitHub repository. Downloading task files from GitHub..."
             Write-SystemMessage -msg1 "- Downloading task files from GitHub repository."
 
+            # GitHub raw URL and file download logic
             $response = Invoke-WebRequest -Uri $taskRepositoryUrl -UseBasicParsing
+            $taskFileLinks = $response.Links | Where-Object { $_.href -match "\.xml$" }
 
-            # Fetch the XML task files from GitHub
-            $xmlFileLinks = $response.Links | Where-Object { $_.href -match "\.xml$" }
-
-            foreach ($link in $xmlFileLinks) {
+            foreach ($link in $taskFileLinks) {
                 $fileUrl = "https://github.com" + $link.href.Replace("/blob/", "/raw/")
                 $fileName = Split-Path -Leaf $fileUrl
                 $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
@@ -1876,6 +1875,7 @@ function Import-TaskRepository {
 
                 Write-Log "$fileName downloaded successfully."
             }
+
         } elseif ($taskRepositoryUrl -match "\.zip$") {
             # Handle ZIP files from other sources
             Write-Log "Detected ZIP file repository. Downloading and extracting..."
@@ -1918,6 +1918,7 @@ function Import-TaskRepository {
         return
     }
 }
+
 
 # Function to activate Windows
 function Activate-Windows {
