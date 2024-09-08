@@ -520,6 +520,7 @@ function Install-ChocolateyApps {
                 # Use double quotes around app name to avoid issues with special characters
                 try {
                     Start-Process -NoNewWindow -Wait -FilePath "choco" -ArgumentList "install `"$app`" -y" -ErrorAction Stop
+                    Start-Process -Wait -FilePath "choco" -ArgumentList "install `"$app`" -y" -ErrorAction Stop
                     Write-Log "$app installed successfully."
                     Write-SystemMessage -msg1 "$app installed successfully." -msg1Color "Green"
                 } catch {
