@@ -1053,6 +1053,102 @@ function Set-Tweaks {
     Write-Log "Tweaks configuration completed."
 }
 
+# Function to configure Privacy settings
+function Set-PrivacySettings {
+
+    # Guard clause to check if the "Privacy" section exists
+    if (-not $config.ContainsKey("Privacy")) {
+        Write-Log "Privacy section not found in the config. Skipping Privacy settings configuration."
+        return
+    }
+
+    Write-SystemMessage -title "Configuring Privacy Settings"
+    Write-Log "Configuring Privacy Settings"
+
+    # Disable Personalized Advertising
+    try {
+        $disableAdvertising = Get-ConfigValue -section "Privacy" -key "DisablePersonalisedAdvertising"
+        if ($disableAdvertising -eq "TRUE") {
+            Write-Log "Disabling Personalized Advertising."
+            Write-SystemMessage -msg1 "- Disabling Personalized Advertising."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -name "Enabled" -type "DWord" -value 0 | Out-Null
+            Write-SuccessMessage -msg "Personalized Advertising disabled."
+        } else {
+            Write-Log "Personalized Advertising not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling Personalized Advertising: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable Personalized Advertising."
+    }
+
+    # Disable Start Menu Tracking and Telemetry
+    try {
+        $disableStartMenuTracking = Get-ConfigValue -section "Privacy" -key "DisableStartMenuTracking"
+        if ($disableStartMenuTracking -eq "TRUE") {
+            Write-Log "Disabling Start Menu Tracking and Telemetry."
+            Write-SystemMessage -msg1 "- Disabling Start Menu Tracking and Telemetry."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "Start_TrackProgs" -type "DWord" -value 0 | Out-Null
+            Write-SuccessMessage -msg "Start Menu Tracking and Telemetry disabled."
+        } else {
+            Write-Log "Start Menu Tracking and Telemetry not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling Start Menu Tracking: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable Start Menu Tracking and Telemetry."
+    }
+
+    # Disable Activity History
+    try {
+        $disableActivityHistory = Get-ConfigValue -section "Privacy" -key "DisableActivityHistory"
+        if ($disableActivityHistory -eq "TRUE") {
+            Write-Log "Disabling Activity History."
+            Write-SystemMessage -msg1 "- Disabling Activity History."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Privacy" -name "ActivityHistoryEnabled" -type "DWord" -value 0 | Out-Null
+            Write-SuccessMessage -msg "Activity History disabled."
+        } else {
+            Write-Log "Activity History not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling Activity History: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable Activity History."
+    }
+
+    # Disable Clipboard Data Collection
+    try {
+        $disableClipboardHistory = Get-ConfigValue -section "Privacy" -key "DisableClipboardDataCollection"
+        if ($disableClipboardHistory -eq "TRUE") {
+            Write-Log "Disabling Clipboard Data Collection."
+            Write-SystemMessage -msg1 "- Disabling Clipboard Data Collection."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Clipboard" -name "EnableClipboardHistory" -type "DWord" -value 0 | Out-Null
+            Write-SuccessMessage -msg "Clipboard Data Collection disabled."
+        } else {
+            Write-Log "Clipboard Data Collection not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling Clipboard Data Collection: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable Clipboard Data Collection."
+    }
+
+    # Disable Start Menu Suggestions and Windows Advertising
+    try {
+        $disableStartMenuSuggestions = Get-ConfigValue -section "Privacy" -key "DisableStartMenuSuggestions"
+        if ($disableStartMenuSuggestions -eq "TRUE") {
+            Write-Log "Disabling Start Menu Suggestions and Windows Advertising."
+            Write-SystemMessage -msg1 "- Disabling Start Menu Suggestions and Windows Advertising."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -name "SubscribedContent-338389Enabled" -type "DWord" -value 0 | Out-Null
+            Write-SuccessMessage -msg "Start Menu Suggestions and Windows Advertising disabled."
+        } else {
+            Write-Log "Start Menu Suggestions and Windows Advertising not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling Start Menu Suggestions: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable Start Menu Suggestions and Windows Advertising."
+    }
+
+    Write-SuccessMessage -msg "Privacy settings configured successfully."
+}
+
+
 # Function to add registry entries
 function Add-RegistryEntries {
     
@@ -1862,6 +1958,7 @@ Set-DisableCopilot
 Set-PowerSettings
 Set-SystemTimezone
 Set-TaskbarFeatures
+Set-PrivacySettings
 Set-Tweaks
 Set-Wallpaper
 Set-LockScreenImage
