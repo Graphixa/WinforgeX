@@ -52,7 +52,6 @@ function Get-ConfigFile {
     return $configFile
 }
 
-
 # Function to read INI file
 function Read-ConfigFile {
     param (
@@ -171,7 +170,7 @@ function Write-ErrorMessage {
     Write-Host $_.Exception.Message -ForegroundColor White
     Write-Host
   }
-  
+
 function Write-SuccessMessage {
     param (
       [Parameter()]
@@ -185,7 +184,6 @@ function Write-SuccessMessage {
     Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor Green
     Write-Host
   }
-
 
 # Function to add, modify, or remove registry settings
 function RegistryTouch {
@@ -245,7 +243,6 @@ function RegistryTouch {
     }
 }
 
-
 function Set-SystemCheckpoint {
     $date = Get-Date -Format "dd/MM/yyyy"
     $snapshotName = "Winforge - $date"
@@ -269,7 +266,6 @@ function Set-SystemCheckpoint {
         Return
     }
 }
-
 
 # Function to set computer name
 function Set-ComputerName {
@@ -313,7 +309,6 @@ function Set-Locale {
         Return
     }
 }
-
 
 # Function to set timezone
 function Set-SystemTimezone {
@@ -403,7 +398,6 @@ function Set-DisableCopilot {
     }
 }
 
-
 # Function to test if a program is installed
 function Test-ProgramInstalled {
     param(
@@ -491,7 +485,6 @@ function Install-WingetApps {
     }
 }
 
-
 # Function to install Chocolatey and Chocolatey Apps
 function Install-ChocolateyApps {
     try {
@@ -546,10 +539,6 @@ function Install-ChocolateyApps {
         return
     }
 }
-
-
-
-
 
 # Function to test if a font is installed
 function Test-FontInstalled {
@@ -741,8 +730,6 @@ function Install-Office {
     }
 }
 
-
-
 # Function to set wallpaper
 function Set-Wallpaper {
     try {
@@ -794,8 +781,6 @@ function Set-Wallpaper {
     }
 }
 
-
-
 # Function to set lock screen image
 function Set-LockScreenImage {
     try {
@@ -846,7 +831,6 @@ function Set-LockScreenImage {
         Return
     }
 }
-
 
 # Function to configure Taskbar Features
 function Set-TaskbarFeatures {
@@ -920,8 +904,6 @@ function Set-TaskbarFeatures {
     Write-Log "Taskbar features configuration completed."
     Write-SuccessMessage -msg "Taskbar features applied successfully."
 }
-
-
 
 function Set-ThemeSettings {
     Write-SystemMessage -title "Applying Theme Settings"
@@ -1071,17 +1053,14 @@ function Set-Tweaks {
     Write-Log "Tweaks configuration completed."
 }
 
-
-
-
 # Function to add registry entries
 function Add-RegistryEntries {
-    try {
-        # Check if the RegistryAdd section exists in the config
-        if ($config.ContainsKey("RegistryAdd")) {
-            Write-SystemMessage -title "Adding Registry Entries"
-            $registryEntries = $config["RegistryAdd"]
-
+    
+    if ($config.ContainsKey("RegistryAdd")) {
+        Write-SystemMessage -title "Adding Registry Entries"
+        $registryEntries = $config["RegistryAdd"]
+        try {
+            # Check if the RegistryAdd section exists in the config
             # Loop through each entry in the RegistryAdd section
             foreach ($entry in $registryEntries.GetEnumerator()) {
                 # Extract key parts from $entryString
@@ -1108,24 +1087,27 @@ function Add-RegistryEntries {
                 # Use RegistryTouch function to add the registry entry and check for success
                 try {
                     RegistryTouch -action "add" -path $path -name $name -type $type -value $expandedValue | Out-Null
-                } catch {
+                }
+                catch {
                     Write-ErrorMessage -msg "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
                     Write-Log "Failed to add registry entry: Path=$path, Name=$name, Type=$type, Value=$expandedValue. Error: $($_.Exception.Message)"
                     continue
                 }
             }
-
-            Write-Log "Add Registry entries complete."
-        } else {
-            Write-Log "No registry entries to add. Missing configuration."
         }
-    } catch {
-        Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
-        Write-Log "Error adding registry entries: $($_.Exception.Message)"
-        Return
-    }
-}
+        catch {
+            Write-ErrorMessage -msg "Error adding registry entries: $($_.Exception.Message)"
+            Write-Log "Error adding registry entries: $($_.Exception.Message)"
+            Return
+        }
 
+        Write-Log "Add Registry entries complete."
+    }
+    else {
+        Write-Log "No registry entries to add. Missing configuration."
+    }
+
+}
 
 # Function to remove registry entries
 function Remove-RegistryEntries {
@@ -1175,8 +1157,6 @@ function Remove-RegistryEntries {
         Return
     }
 }
-
-
 
 # Function to configure power settings
 function Set-PowerSettings {
@@ -1280,13 +1260,202 @@ function Set-WindowsUpdates {
     }
 }
 
+
+# Function to set optional windows features and services
+function Set-Services {
+    
+    try {
+        $services = $config["Services"]
+        if ($services) {
+            Write-SystemMessage -title "Configuring Services"
+            foreach ($service in $services.GetEnumerator()) {
+                $serviceName = $service.Key
+                $serviceAction = $service.Value.ToLower()
+                try {
+                    # Check if the feature is installed or not
+                    $featureStatus = Get-WindowsOptionalFeature -Online -FeatureName $serviceName
+
+                    if ($serviceAction -eq "enabled") {
+                        if ($featureStatus.State -eq "Disabled") {
+                            Write-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
+                            Write-Log "Enabling service: $serviceName"
+                            Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
+                            Write-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
+                        } else {
+                            Write-Log "$serviceName is already enabled. Skipping."
+                            Write-SystemMessage -msg1 "$serviceName is already enabled. Skipping." -msg1Color "Cyan"
+                        }
+                    } elseif ($serviceAction -eq "disabled") {
+                        if ($featureStatus.State -eq "Enabled") {
+                            Write-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
+                            Write-Log "Disabling service: $serviceName"
+                            Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
+                            Write-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
+                        } else {
+                            Write-Log "$serviceName is already disabled. Skipping."
+                            Write-SystemMessage -msg1 "$serviceName is already disabled. Skipping." -msg1Color "Cyan"
+                        }
+                    } else {
+                        Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg1Color "Red"
+                        Write-Log "Invalid service action for ${serviceName}: $serviceAction"
+                    }
+                } catch {
+                    Write-ErrorMessage -msg "$serviceName was not found as an optional service, check spelling and fix the configuration file."
+                    Write-Log "Error configuring service ${serviceName}: $($_.Exception.Message)"
+                }
+            }
+            Write-Log "Service configurations applied successfully."
+            Write-SuccessMessage
+        } else {
+            Write-Log -msg1 "No services to configure. Missing configuration."
+        }
+    } catch {
+        Write-Log "Error configuring services: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Error configuring services: $($_.Exception.Message)"
+        Return
+    }
+}
+
+# Function to configure security settings
+function Set-SecuritySettings {
+
+    # Guard clause to check if "Security" section exists in the config file
+    if (-not $config.ContainsKey("Security")) {
+        return
+    }
+
+    Write-SystemMessage -title "Configuring Security Settings"
+    Write-Log "Configuring Security Settings"
+
+    # Set UAC level
+    try {
+        $uacLevel = Get-ConfigValue -section "Security" -key "UACLevel"
+        if ($uacLevel) {
+            Write-Log "Setting UAC level to: $uacLevel"
+            Write-SystemMessage -msg1 "- Setting UAC level to: " -msg2 $uacLevel
+            RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel | Out-Null
+            Write-SuccessMessage -msg "UAC level set to $uacLevel."
+        } else {
+            Write-Log "UAC level not set. Skipping."
+        }
+    } catch {
+        Write-Log "Error setting UAC level: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to set UAC level."
+    }
+
+    # Disable/Enable Telemetry
+    try {
+        $disableTelemetry = Get-ConfigValue -section "Security" -key "DisableTelemetry"
+        if ($disableTelemetry) {
+            $telemetryValue = if ($disableTelemetry -eq "TRUE") { 0 } else { 1 }
+            Write-Log "Setting telemetry to: $disableTelemetry"
+            Write-SystemMessage -msg1 "- Configuring telemetry settings."
+            
+            $telemetryKeys = @(
+                @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=$telemetryValue; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=$telemetryValue; type="DWord"},
+                @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=$telemetryValue; type="DWord"}
+            )
+            foreach ($key in $telemetryKeys) {
+                RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value | Out-Null
+            }
+            Write-SuccessMessage -msg "Telemetry settings applied."
+        } else {
+            Write-Log "Telemetry not configured. Skipping."
+        }
+    } catch {
+        Write-Log "Error configuring telemetry: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to configure telemetry."
+    }
+
+    # Show/Hide file extensions
+    try {
+        $showFileExtensions = Get-ConfigValue -section "Security" -key "ShowFileExtensions"
+        if ($showFileExtensions) {
+            $fileExtValue = if ($showFileExtensions -eq "TRUE") { 0 } else { 1 }
+            Write-Log "Configuring file extensions visibility to: $showFileExtensions"
+            Write-SystemMessage -msg1 "- Configuring file extensions visibility."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $fileExtValue | Out-Null
+            Write-SuccessMessage -msg "File extensions visibility configured."
+        } else {
+            Write-Log "File extensions visibility not set. Skipping."
+        }
+    } catch {
+        Write-Log "Error configuring file extensions: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to configure file extensions."
+    }
+
+    # Disable AutoPlay and AutoRun
+    try {
+        $disableAutoPlay = Get-ConfigValue -section "Security" -key "DisableAutoPlay"
+        if ($disableAutoPlay -eq "TRUE") {
+            Write-Log "Disabling AutoPlay and AutoRun."
+            Write-SystemMessage -msg1 "- Disabling AutoPlay and AutoRun."
+            RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -name "NoDriveTypeAutoRun" -type "DWord" -value 255 | Out-Null
+            Write-SuccessMessage -msg "AutoPlay and AutoRun disabled."
+        } else {
+            Write-Log "AutoPlay and AutoRun not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling AutoPlay and AutoRun: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable AutoPlay and AutoRun."
+    }
+
+    # Disable SMBv1
+    try {
+        $disableSMBv1 = Get-ConfigValue -section "Security" -key "DisableSMBv1"
+        if ($disableSMBv1 -eq "TRUE") {
+            Write-Log "Disabling SMBv1."
+            Write-SystemMessage -msg1 "- Disabling SMBv1."
+            Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
+            Write-SuccessMessage -msg "SMBv1 disabled."
+        } else {
+            Write-Log "SMBv1 not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling SMBv1: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable SMBv1."
+    }
+
+    # Disable Remote Desktop
+    try {
+        $disableRemoteDesktop = Get-ConfigValue -section "Security" -key "DisableRemoteDesktop"
+        if ($disableRemoteDesktop -eq "TRUE") {
+            Write-Log "Disabling Remote Desktop."
+            Write-SystemMessage -msg1 "- Disabling Remote Desktop."
+            RegistryTouch -action "add" -path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -name "fDenyTSConnections" -type "DWord" -value 1 | Out-Null
+            Write-SuccessMessage -msg "Remote Desktop disabled."
+        } else {
+            Write-Log "Remote Desktop not disabled. Skipping."
+        }
+    } catch {
+        Write-Log "Error disabling Remote Desktop: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Failed to disable Remote Desktop."
+    }
+
+    Write-SuccessMessage -msg "Security settings configured successfully."
+}
+
 # Function to manage BitLocker
 function Set-Bitlocker {
-    try {
-        # Get BitLocker settings from the config
-        $enableBitlocker = Get-ConfigValue -section "Security" -key "EnableBitlocker"
-        $bitlockerTarget = Get-ConfigValue -section "Security" -key "BitlockerTarget"
 
+    # Get BitLocker settings from the config
+    $enableBitlocker = Get-ConfigValue -section "Security" -key "EnableBitlocker"
+    $bitlockerTarget = Get-ConfigValue -section "Security" -key "BitlockerTarget"
+
+    # Guard clause for EnableBitlocker setting
+    if (-not $enableBitlocker) {
+        Write-Log "EnableBitlocker not set. Skipping BitLocker configuration."
+        return
+    }
+
+    # Guard clause for BitlockerTarget setting
+    if (-not $bitlockerTarget) {
+        Write-Log "BitlockerTarget not set. Skipping BitLocker configuration."
+        return
+    }
+
+    try {
         Write-SystemMessage -title "Configuring BitLocker"
 
         if ($enableBitlocker -eq "TRUE") {
@@ -1355,233 +1524,6 @@ function Set-Bitlocker {
     }
 }
 
-
-
-# Function to set optional windows features and services
-function Set-Services {
-    try {
-        $services = $config["Services"]
-        if ($services) {
-            Write-SystemMessage -title "Configuring Services"
-            foreach ($service in $services.GetEnumerator()) {
-                $serviceName = $service.Key
-                $serviceAction = $service.Value.ToLower()
-                try {
-                    # Check if the feature is installed or not
-                    $featureStatus = Get-WindowsOptionalFeature -Online -FeatureName $serviceName
-
-                    if ($serviceAction -eq "enabled") {
-                        if ($featureStatus.State -eq "Disabled") {
-                            Write-SystemMessage -msg1 "- Enabling: " -msg2 $serviceName
-                            Write-Log "Enabling service: $serviceName"
-                            Enable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
-                            Write-SystemMessage -msg1 "- $serviceName enabled successfully." -msg1Color "Green"
-                        } else {
-                            Write-Log "$serviceName is already enabled. Skipping."
-                            Write-SystemMessage -msg1 "$serviceName is already enabled. Skipping." -msg1Color "Cyan"
-                        }
-                    } elseif ($serviceAction -eq "disabled") {
-                        if ($featureStatus.State -eq "Enabled") {
-                            Write-SystemMessage -msg1 "- Disabling: " -msg2 $serviceName
-                            Write-Log "Disabling service: $serviceName"
-                            Disable-WindowsOptionalFeature -FeatureName $serviceName -Online -NoRestart -LogLevel 1 | Out-Null
-                            Write-SystemMessage -msg1 "- $serviceName disabled successfully." -msg1Color "Green"
-                        } else {
-                            Write-Log "$serviceName is already disabled. Skipping."
-                            Write-SystemMessage -msg1 "$serviceName is already disabled. Skipping." -msg1Color "Cyan"
-                        }
-                    } else {
-                        Write-SystemMessage -msg1 "- Invalid service action for: " -msg2 $serviceName -msg1Color "Red"
-                        Write-Log "Invalid service action for ${serviceName}: $serviceAction"
-                    }
-                } catch {
-                    Write-ErrorMessage -msg "$serviceName was not found as an optional service, check spelling and fix the configuration file."
-                    Write-Log "Error configuring service ${serviceName}: $($_.Exception.Message)"
-                }
-            }
-            Write-Log "Service configurations applied successfully."
-            Write-SuccessMessage
-        } else {
-            Write-Log -msg1 "No services to configure. Missing configuration."
-        }
-    } catch {
-        Write-Log "Error configuring services: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error configuring services: $($_.Exception.Message)"
-        Return
-    }
-}
-
-
-
-# Function to configure security settings
-function Set-SecuritySettings {
-    try {
-        $uacLevel = Get-ConfigValue -section "Security" -key "UACLevel"
-        $disableTelemetry = Get-ConfigValue -section "Security" -key "DisableTelemetry"
-        $showFileExtensions = Get-ConfigValue -section "Security" -key "ShowFileExtensions"
-        $disableCopilot = Get-ConfigValue -section "Security" -key "DisableCopilot"
-        $disableOneDrive = Get-ConfigValue -section "Security" -key "DisableOneDrive"
-        $disableAutoPlay = Get-ConfigValue -section "Security" -key "DisableAutoPlay"
-        $disableSMBv1 = Get-ConfigValue -section "Security" -key "DisableSMBv1"
-        $disableRemoteDesktop = Get-ConfigValue -section "Security" -key "DisableRemoteDesktop"
-
-        Write-Log "Configuring Security Settings"
-        Write-SystemMessage -title "Configuring Security Settings"
-
-        # Set UAC level
-        if ($uacLevel) {
-            Write-SystemMessage -msg1 "- Setting UAC level to: " -msg2 $uacLevel
-            Write-Log "Setting UAC level to: $uacLevel"
-            RegistryTouch -action "add" -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -name "ConsentPromptBehaviorAdmin" -type "DWord" -value $uacLevel | Out-Null
-            Write-SystemMessage -msg1 "- UAC level set to $uacLevel." -msg1Color "Green"
-        } else {
-            Write-Log "UAC level not set. Missing configuration."
-        }
-
-        # Disable/Enable Telemetry
-        if ($disableTelemetry -eq "TRUE") {
-            Write-SystemMessage -msg1 "- Disabling Windows Telemetry..."
-            Write-Log "Disabling Windows Telemetry"
-            $telemetryValue = 0
-        } elseif ($disableTelemetry -eq "FALSE") {
-            Write-SystemMessage -msg1 "- Enabling Windows Telemetry..."
-            Write-Log "Enabling Windows Telemetry"
-            $telemetryValue = 1
-        } else {
-            Write-Log "Telemetry settings not changed. Missing configuration."
-            Return
-        }
-        $telemetryKeys = @(
-            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; name="AllowTelemetry"; value=$telemetryValue; type="DWord"},
-            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="AllowTelemetry"; value=$telemetryValue; type="DWord"},
-            @{path="HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; name="MaxTelemetryAllowed"; value=$telemetryValue; type="DWord"}
-        )
-        foreach ($key in $telemetryKeys) {
-            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value | Out-Null
-        }
-        Write-SystemMessage -msg1 "- Windows Telemetry setting applied." -msg1Color "Green"
-        Write-Log "Windows Telemetry setting applied."
-
-        # Show/Hide file extensions
-        if ($showFileExtensions -eq "TRUE") {
-            Write-SystemMessage -msg1 "- Showing file extensions in Explorer."
-            Write-Log "Configuring file type extension visibility to show"
-            $fileExtValue = 0
-        } elseif ($showFileExtensions -eq "FALSE") {
-            Write-SystemMessage -msg1 "- Hiding file extensions in Explorer."
-            Write-Log "Configuring file type extension visibility to hide"
-            $fileExtValue = 1
-        } else {
-            Write-ErrorMessage -msg "Invalid value for ShowFileExtensions: $showFileExtensions"
-            Write-Log "Invalid value for ShowFileExtensions: $showFileExtensions"
-            Return
-        }
-        RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -type "DWord" -value $fileExtValue | Out-Null
-        Write-SystemMessage -msg1 "- File type extension visibility configured." -msg1Color "Green"
-        Write-Log "File type extension visibility configured."
-
-        # Disable/Enable Copilot
-        if ($disableCopilot -eq "TRUE") {
-            Write-SystemMessage -msg1 "- Disabling Windows Copilot..."
-            Write-Log "Disabling Windows Copilot"
-            $copilotValue = 0
-        } elseif ($disableCopilot -eq "FALSE") {
-            Write-SystemMessage -msg1 "- Enabling Windows Copilot..."
-            Write-Log "Enabling Windows Copilot"
-            $copilotValue = 1
-        } else {
-            Write-ErrorMessage -msg "Invalid value for DisableCopilot: $disableCopilot"
-            Write-Log "Invalid value for DisableCopilot: $disableCopilot"
-            Return
-        }
-        RegistryTouch -action "add" -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value $copilotValue | Out-Null
-        Write-SystemMessage -msg1 "- Windows Copilot setting applied." -msg1Color "Green"
-        Write-Log "Windows Copilot setting applied."
-
-        # Disable/Enable OneDrive
-        if ($disableOneDrive -eq "TRUE") {
-            Write-SystemMessage -msg1 "- Disabling OneDrive..."
-            Write-Log "Disabling OneDrive"
-            $oneDriveValue = 1
-        } elseif ($disableOneDrive -eq "FALSE") {
-            Write-SystemMessage -msg1 "- Enabling OneDrive..."
-            Write-Log "Enabling OneDrive"
-            $oneDriveValue = 0
-        } else {
-            Write-ErrorMessage -msg "Invalid value for DisableOneDrive: $disableOneDrive"
-            Write-Log "Invalid value for DisableOneDrive: $disableOneDrive"
-            Return
-        }
-        $oneDriveKeys = @(
-            @{path="HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive"; name="DisableFileSyncNGSC"; value=$oneDriveValue; type="DWord"},
-            @{path="HKLM:\SOFTWARE\Microsoft\OneDrive"; name="PreventNetworkTrafficPreWindows10Apps"; value=$oneDriveValue; type="DWord"}
-        )
-        foreach ($key in $oneDriveKeys) {
-            RegistryTouch -action "add" -path $key.path -name $key.name -type $key.type -value $key.value | Out-Null
-        }
-        if ($disableOneDrive -eq "TRUE") {
-            Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
-        }
-        Write-SystemMessage -msg1 "- OneDrive setting applied." -msg1Color "Green"
-        Write-Log "OneDrive setting applied."
-
-        # Disable AutoPlay and AutoRun
-        if ($disableAutoPlay -eq "TRUE") {
-            Write-Log "Disabling AutoPlay and AutoRun."
-            Write-SystemMessage -msg1 "- Disabling AutoPlay and AutoRun."
-            try {
-                RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -name "NoDriveTypeAutoRun" -type "DWord" -value 255 | Out-Null
-                Write-SuccessMessage -msg "AutoPlay and AutoRun disabled."
-            } catch {
-                Write-Log "Error disabling AutoPlay and AutoRun: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "Failed to disable AutoPlay and AutoRun."
-            }
-        } else {
-            Write-Log "AutoPlay and AutoRun not disabled. Skipping."
-        }
-
-        # Disable SMBv1
-        if ($disableSMBv1 -eq "TRUE") {
-            Write-Log "Disabling SMBv1."
-            Write-SystemMessage -msg1 "- Disabling SMBv1."
-            try {
-                Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
-                Write-SuccessMessage -msg "SMBv1 disabled."
-            } catch {
-                Write-Log "Error disabling SMBv1: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "Failed to disable SMBv1."
-            }
-        } else {
-            Write-Log "SMBv1 not disabled. Skipping."
-        }
-
-        # Disable Remote Desktop
-        if ($disableRemoteDesktop -eq "TRUE") {
-            Write-Log "Disabling Remote Desktop."
-            Write-SystemMessage -msg1 "- Disabling Remote Desktop."
-            try {
-                RegistryTouch -action "add" -path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -name "fDenyTSConnections" -type "DWord" -value 1 | Out-Null
-                Write-SuccessMessage -msg "Remote Desktop disabled."
-            } catch {
-                Write-Log "Error disabling Remote Desktop: $($_.Exception.Message)"
-                Write-ErrorMessage -msg "Failed to disable Remote Desktop."
-            }
-        } else {
-            Write-Log "Remote Desktop not disabled. Skipping."
-        }
-
-        Write-SuccessMessage -msg "Security settings configured successfully."
-    } catch {
-        Write-ErrorMessage -msg "Error configuring security settings: $($_.Exception.Message)"
-        Write-Log "Error configuring security settings: $($_.Exception.Message)"
-        Return
-    }
-}
-
-
-
-
-
 # Function to set environment variables
 function Set-EnvironmentVariables {
     try {
@@ -1606,7 +1548,6 @@ function Set-EnvironmentVariables {
         Return
     }
 }
-
 
 # Function to install Chrome Enterprise
 function Install-ChromeEnterprise {
@@ -1659,8 +1600,6 @@ function Install-ChromeEnterprise {
         }
     }
 }
-
-
 
 # Function to install GCPW
 function Install-GCPW {
@@ -1730,8 +1669,6 @@ function Install-GCPW {
     }
 }
 
-
-
 # Function to install Google Drive
 function Install-GoogleDrive {
 
@@ -1774,9 +1711,6 @@ function Install-GoogleDrive {
         }
     }
 }
-
-
-
 
 # Function to import tasks into Task Scheduler
 function Import-Tasks {
@@ -1874,7 +1808,6 @@ function Import-Tasks {
     }
 }
 
-
 # Function to activate Windows
 function Activate-Windows {
 
@@ -1900,9 +1833,6 @@ function Activate-Windows {
         Return
     }
 }
-
-
-
 
 # Main script execution
 if (-not (Test-IsAdmin)) {
