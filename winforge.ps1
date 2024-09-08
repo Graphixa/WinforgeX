@@ -174,14 +174,14 @@ function Write-ErrorMessage {
 function Write-SuccessMessage {
     param (
       [Parameter()]
-      $msg = "COMPLETE",
+      $msg = "Success",
   
       [Parameter()]
       $msgColor = 'Green'
     )
   
     Write-Host
-    Write-Host "> $msg ".ToUpper() -ForegroundColor $msgColor -BackgroundColor Black
+    Write-Host "Success: $msg " -ForegroundColor $msgColor -BackgroundColor Black
     Write-Host
   }
 
