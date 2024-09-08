@@ -136,7 +136,7 @@ function Write-SystemMessage {
     
     if ($PSBoundParameters.ContainsKey('title')) {
         Write-Host
-        Write-Host " $title " -ForegroundColor Black -BackgroundColor $titleColor
+        Write-Host " $title ".ToUpper() -ForegroundColor Black -BackgroundColor $titleColor 
         Write-Host
     }
   
