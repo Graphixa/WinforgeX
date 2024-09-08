@@ -1784,8 +1784,13 @@ function Import-Tasks {
         Write-SystemMessage -title "Importing Scheduled Tasks"
 
         foreach ($key in $tasksSection.Keys) {
+            
             # Proceed only if the key is not "TaskRepository" as this is handled by the Import-TaskRepository function
-            if ($key -ne "TaskRepository") {
+            if ($key -eq "TaskRepository") {
+                continue
+            }
+
+            else {
                 $taskFile = $tasksSection[$key]
 
                 # Extract the file name from the task file (works for URLs, local paths, or network shares)
@@ -1801,14 +1806,16 @@ function Import-Tasks {
                         
                         # Download the task file
                         Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
-                    } elseif (Test-Path $taskFile) {
+                    }
+                    elseif (Test-Path $taskFile) {
                         # Handle local or network file
                         Write-Log "Copying task file from local/network path: $taskFile"
                         Write-SystemMessage -msg1 "- Copying task file from: " -msg2 $taskFile
                         
                         # Copy the task file to the temp directory
                         Copy-Item -Path $taskFile -Destination $tempTaskFile -Force
-                    } else {
+                    }
+                    else {
                         throw "The task file does not exist or is inaccessible: $taskFile"
                     }
 
@@ -1816,11 +1823,12 @@ function Import-Tasks {
                     Write-SystemMessage -msg1 "- Importing task: " -msg2 $fileName
                     Write-Log "Importing task: $fileName"
 
-                    Register-ScheduledTask -TaskName $key -Xml (Get-Content $tempTaskFile | Out-String) -Force
+                    Register-ScheduledTask -TaskName $key -Xml (Get-Content $tempTaskFile | Out-String) -Force | Out-Null
 
                     Write-SuccessMessage -msg "Task $key imported successfully."
                     Write-Log "Task $key imported successfully."
-                } catch {
+                }
+                catch {
                     Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
                     Write-Log "Error: Failed to import task ${taskFile}: $($_.Exception.Message)"
                     return
@@ -1829,7 +1837,8 @@ function Import-Tasks {
         }
         Write-Log "Scheduled task(s) import complete."
         Write-SuccessMessage -msg "Scheduled task(s) import complete."
-    } catch {
+    }
+    catch {
         Write-ErrorMessage -msg "Error importing task(s): $($_.Exception.Message)"
         Write-Log "Error importing tasks: $($_.Exception.Message)"
         return
