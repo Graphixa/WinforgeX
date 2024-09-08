@@ -786,6 +786,80 @@ function Set-LockScreenImage {
 }
 
 
+# Function to configure Taskbar Features
+function Set-TaskbarFeatures {
+    Write-SystemMessage -title "Applying Taskbar Features"
+
+    # Disable 'Meet Now' icon on Taskbar
+    $disableMeetNow = Get-ConfigValue -section "Taskbar" -key "DisableMeetNow"
+    if ($disableMeetNow -eq "TRUE") {
+        Write-Log "Disabling 'Meet Now' icon on Taskbar."
+        Write-SystemMessage -msg1 "- Disabling 'Meet Now' icon."
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "HideSCAMeetNow" -Value 1 -PropertyType DWord -Force | Out-Null
+            Write-SuccessMessage -msg "'Meet Now' icon disabled."
+        } catch {
+            Write-Log "Error disabling 'Meet Now' icon: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to disable 'Meet Now' icon."
+        }
+    } else {
+        Write-Log "'Meet Now' icon not disabled. Skipping."
+    }
+
+    # Disable Taskbar Widgets (Weather, News, etc.)
+    $disableWidgets = Get-ConfigValue -section "Taskbar" -key "DisableWidgets"
+    if ($disableWidgets -eq "TRUE") {
+        Write-Log "Disabling Taskbar Widgets (Weather, News, etc.)."
+        Write-SystemMessage -msg1 "- Disabling Taskbar Widgets."
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0 -PropertyType DWord -Force | Out-Null
+            Write-SuccessMessage -msg "Taskbar Widgets disabled."
+        } catch {
+            Write-Log "Error disabling Taskbar Widgets: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to disable Taskbar Widgets."
+        }
+    } else {
+        Write-Log "Taskbar Widgets not disabled. Skipping."
+    }
+
+    # Disable Task View button on Taskbar
+    $disableTaskView = Get-ConfigValue -section "Taskbar" -key "DisableTaskView"
+    if ($disableTaskView -eq "TRUE") {
+        Write-Log "Disabling Task View button on Taskbar."
+        Write-SystemMessage -msg1 "- Disabling Task View button."
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0 -PropertyType DWord -Force | Out-Null
+            Write-SuccessMessage -msg "Task View button disabled."
+        } catch {
+            Write-Log "Error disabling Task View button: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to disable Task View button."
+        }
+    } else {
+        Write-Log "Task View button not disabled. Skipping."
+    }
+
+    # Disable Search in Taskbar (online search)
+    $disableSearch = Get-ConfigValue -section "Taskbar" -key "DisableSearch"
+    if ($disableSearch -eq "TRUE") {
+        Write-Log "Disabling online Search in Taskbar."
+        Write-SystemMessage -msg1 "- Disabling online Search in Taskbar."
+        try {
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Value 0 -PropertyType DWord -Force | Out-Null
+            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "CortanaConsent" -Value 0 -PropertyType DWord -Force | Out-Null
+            Write-SuccessMessage -msg "Online Search disabled in Taskbar."
+        } catch {
+            Write-Log "Error disabling online Search in Taskbar: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to disable online Search in Taskbar."
+        }
+    } else {
+        Write-Log "Online Search not disabled in Taskbar. Skipping."
+    }
+
+    Write-Log "Taskbar features configuration completed."
+    Write-SuccessMessage -msg "Taskbar features applied successfully."
+}
+
+
 
 function Set-ThemeSettings {
     Write-SystemMessage -title "Applying Theme Settings"
@@ -1793,6 +1867,7 @@ Set-EnvironmentVariables
 Set-Locale
 Set-PowerSettings
 Set-SystemTimezone
+Set-TaskbarFeatures
 Set-Tweaks
 Set-Wallpaper
 Set-LockScreenImage
