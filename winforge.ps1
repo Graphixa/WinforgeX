@@ -124,10 +124,10 @@ function Write-SystemMessage {
         [string] $msg2 = '',
   
         [Parameter()]
-        $titleColor = 'Yellow',
+        $titleColor = 'DarkMagenta',
   
         [Parameter()]
-        $msg1Color = 'Cyan',
+        $msg1Color = 'DarkYellow',
 
         [Parameter()]
         $msg2color = 'White'
@@ -136,7 +136,7 @@ function Write-SystemMessage {
     
     if ($PSBoundParameters.ContainsKey('title')) {
         Write-Host
-        Write-Host " $title ".ToUpper() -ForegroundColor Black -BackgroundColor $titleColor 
+        Write-Host " $title ".ToUpper() -ForegroundColor White -BackgroundColor $titleColor 
         Write-Host
     }
   
@@ -161,13 +161,13 @@ function Write-ErrorMessage {
       $msg = "CRITICAL ERROR",
   
       [Parameter()]
-      $color = 'Black'
+      $color = 'White'
     )
   
     Write-Host
-    Write-Host " $msg " -ForegroundColor $color -BackgroundColor Red
+    Write-Host " $msg ".ToUpper() -ForegroundColor $color -BackgroundColor Red
     Write-Host
-    Write-Host $_.Exception.Message -ForegroundColor White
+    Write-Host $_.Exception.Message -ForegroundColor Red
     Write-Host
   }
 
@@ -177,11 +177,11 @@ function Write-SuccessMessage {
       $msg = "COMPLETE",
   
       [Parameter()]
-      $msgColor = 'Black'
+      $msgColor = 'White'
     )
   
     Write-Host
-    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor Green
+    Write-Host " $msg " -ForegroundColor $msgColor -BackgroundColor DarkGreen
     Write-Host
   }
 
@@ -1503,7 +1503,7 @@ function Set-SecuritySettings {
         if ($disableSMBv1 -eq "TRUE") {
             Write-Log "Disabling SMBv1."
             Write-SystemMessage -msg1 "- Disabling SMBv1."
-            Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
+            Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart | Out-Null
             Write-SuccessMessage -msg "SMBv1 disabled."
         } else {
             Write-Log "SMBv1 not disabled. Skipping."
