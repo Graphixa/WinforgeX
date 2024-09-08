@@ -1,18 +1,28 @@
 # FEATURES TO ADD
 
 ### Tweaks
-- Option to bring back old context menu tweak and other tweaks under a tweaks Key
 - Disable Widgets
-- Start Menu Taskbar-Alignment="Centre" or Left
 - Start Menu Classic
-- StartMenu-ShowTaskview="False" or true
-- StartMenu-ShowWidgets="False" or True
+
+- 
 
 ### Privacy
-- PersonlisdAdvertising="False" or true
-- Option to disable Start menu suggestions and windows advertising
-- StartMenuTracking="False or True (Let windows improve start and search results by tracking app launches.)
-- ActiityHistory="False" or True (store my activity history on this device)
+- Disable Personlisd Advertising on System
+- Disable Start Menu Tracking and Telemetry (Let windows improve start and search results by tracking app launches.)
+- Disable Actiity History (i.e. store my activity history on this device)
+- Disable clipboard data collection
+  
+### System
+- Remove 'Meet Now' icon from taskbar
+- Remove Copilot
+- Remove OneDrive
+- Disable Start menu suggestions and windows advertising
+- Disable Start Menu Widgets (i.e. Weather, news etc)
+- Disable Task View on Start Menu
+
+
+### Security
+- Disable autoplay and autorun
 
 # BUGFIXES
 [] Fix Install-Apps function (Currently using just VLC for --id in winget and not working), need to find a way to have the apps appear as a list within the INI config file.

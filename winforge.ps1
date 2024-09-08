@@ -1285,6 +1285,9 @@ function Set-SecuritySettings {
         $showFileExtensions = Get-ConfigValue -section "Security" -key "ShowFileExtensions"
         $disableCopilot = Get-ConfigValue -section "Security" -key "DisableCopilot"
         $disableOneDrive = Get-ConfigValue -section "Security" -key "DisableOneDrive"
+        $disableAutoPlay = Get-ConfigValue -section "Security" -key "DisableAutoPlay"
+        $disableSMBv1 = Get-ConfigValue -section "Security" -key "DisableSMBv1"
+        $disableRemoteDesktop = Get-ConfigValue -section "Security" -key "DisableRemoteDesktop"
 
         Write-Log "Configuring Security Settings"
         Write-SystemMessage -title "Configuring Security Settings"
@@ -1386,6 +1389,51 @@ function Set-SecuritySettings {
         Write-SystemMessage -msg1 "- OneDrive setting applied." -msg1Color "Green"
         Write-Log "OneDrive setting applied."
 
+        # Disable AutoPlay and AutoRun
+        if ($disableAutoPlay -eq "TRUE") {
+            Write-Log "Disabling AutoPlay and AutoRun."
+            Write-SystemMessage -msg1 "- Disabling AutoPlay and AutoRun."
+            try {
+                RegistryTouch -action "add" -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -name "NoDriveTypeAutoRun" -type "DWord" -value 255 | Out-Null
+                Write-SuccessMessage -msg "AutoPlay and AutoRun disabled."
+            } catch {
+                Write-Log "Error disabling AutoPlay and AutoRun: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to disable AutoPlay and AutoRun."
+            }
+        } else {
+            Write-Log "AutoPlay and AutoRun not disabled. Skipping."
+        }
+
+        # Disable SMBv1
+        if ($disableSMBv1 -eq "TRUE") {
+            Write-Log "Disabling SMBv1."
+            Write-SystemMessage -msg1 "- Disabling SMBv1."
+            try {
+                Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
+                Write-SuccessMessage -msg "SMBv1 disabled."
+            } catch {
+                Write-Log "Error disabling SMBv1: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to disable SMBv1."
+            }
+        } else {
+            Write-Log "SMBv1 not disabled. Skipping."
+        }
+
+        # Disable Remote Desktop
+        if ($disableRemoteDesktop -eq "TRUE") {
+            Write-Log "Disabling Remote Desktop."
+            Write-SystemMessage -msg1 "- Disabling Remote Desktop."
+            try {
+                RegistryTouch -action "add" -path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -name "fDenyTSConnections" -type "DWord" -value 1 | Out-Null
+                Write-SuccessMessage -msg "Remote Desktop disabled."
+            } catch {
+                Write-Log "Error disabling Remote Desktop: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to disable Remote Desktop."
+            }
+        } else {
+            Write-Log "Remote Desktop not disabled. Skipping."
+        }
+
         Write-SuccessMessage -msg "Security settings configured successfully."
     } catch {
         Write-ErrorMessage -msg "Error configuring security settings: $($_.Exception.Message)"
@@ -1393,6 +1441,7 @@ function Set-SecuritySettings {
         Return
     }
 }
+
 
 
 
