@@ -1771,102 +1771,153 @@ function Install-GoogleDrive {
     }
 }
 
-# Function to import tasks using Register-ScheduledTask
+# Function to import tasks individually
 function Import-Tasks {
     try {
+        # Check if "Tasks" section is present in the configuration
         $tasksSection = $config["Tasks"]
-        if ($tasksSection) {
-            Write-SystemMessage -title "Importing Scheduled Tasks"
-            foreach ($key in $tasksSection.Keys) {
+        if (-not $tasksSection) {
+            Write-Log "No individual tasks specified. Missing configuration."
+            return
+        }
+
+        Write-SystemMessage -title "Importing Scheduled Tasks"
+
+        foreach ($key in $tasksSection.Keys) {
+            # Proceed only if the key is not "TaskRepository" as this is handled by the Import-TaskRepository function
+            if ($key -ne "TaskRepository") {
                 $taskFile = $tasksSection[$key]
 
-                # Check if the key is a folder
-                if ($key -eq "TasksRepository") {
-                    Write-SystemMessage -msg1 "- Checking remote folder: " -msg2 $taskFile
-                    Write-Log "Checking remote folder: $taskFile"
+                # Extract the file name from the task file (works for URLs, local paths, or network shares)
+                $fileName = Split-Path -Leaf $taskFile
+                $tempTaskFile = Join-Path $env:TEMP $fileName
 
-                    try {
-                        # Validate if the URL exists
-                        $response = Invoke-WebRequest -Uri $taskFile -Method Head -ErrorAction Stop
-                        if ($response.StatusCode -eq 200) {
-                            Write-Log "Folder exists. Proceeding with download."
-                            Write-SystemMessage -msg1 "- Remote folder exists. Proceeding with download." -msg1Color "Green"
-
-                            $tempFolder = "$env:TEMP\Tasks"
-                            if (-not (Test-Path $tempFolder)) {
-                                New-Item -ItemType Directory -Path $tempFolder | Out-Null
-                            }
-
-                            $xmlFiles = (Invoke-WebRequest -Uri $taskFile).Links | Where-Object { $_.href -match '\.xml$' }
-
-                            foreach ($xmlFile in $xmlFiles) {
-                                $fileName = [System.IO.Path]::GetFileName($xmlFile.href)
-                                $fileUrl = "$taskFile$fileName"
-                                $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
-
-                                Write-SystemMessage -msg1 "- Downloading task file: " -msg2 $fileUrl
-                                Write-Log "Downloading task file: $fileUrl"
-                                Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
-
-                                # Import the task using Register-ScheduledTask
-                                try {
-                                    $taskName = "$key-$fileName"
-                                    Register-ScheduledTask -TaskName $taskName -Xml (Get-Content $downloadedFile | Out-String) -Force
-                                    Write-SystemMessage -msg1 "- Task $taskName imported successfully." -msg1Color "Green"
-                                    Write-Log "Task $taskName imported successfully."
-                                } catch {
-                                    Write-Log "Failed to register task ${taskName}: $($_.Exception.Message)"
-                                    Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
-                                }
-                            }
-                        } else {
-                            throw "Invalid response code $($response.StatusCode)"
-                        }
-                    } catch {
-                        Write-ErrorMessage -msg "The remote folder does not exist or is inaccessible: $taskFile"
-                        Write-Log "Error: The remote folder does not exist or is inaccessible: $($_.Exception.Message)"
-                        return
+                try {
+                    # Check if it's a remote URL or a local/network path
+                    if ($taskFile -match "^https?://") {
+                        # Handle remote URL
+                        Write-Log "Downloading task file from remote URL: $taskFile"
+                        Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
+                        
+                        # Download the task file
+                        Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
+                    } elseif (Test-Path $taskFile) {
+                        # Handle local or network file
+                        Write-Log "Copying task file from local/network path: $taskFile"
+                        Write-SystemMessage -msg1 "- Copying task file from: " -msg2 $taskFile
+                        
+                        # Copy the task file to the temp directory
+                        Copy-Item -Path $taskFile -Destination $tempTaskFile -Force
+                    } else {
+                        throw "The task file does not exist or is inaccessible: $taskFile"
                     }
-                } else {
-                    # Handle individual task files
-                    try {
-                        $response = Invoke-WebRequest -Uri $taskFile -Method Head -ErrorAction Stop
-                        if ($response.StatusCode -eq 200) {
-                            Write-Log "File exists. Proceeding with download."
-                            Write-SystemMessage -msg1 "- Task file found. Proceeding with download." -msg1Color "Green"
-                            $tempTaskFile = "$env:TEMP\$key.xml"
-                            Write-SystemMessage -msg1 "- Downloading task file from: " -msg2 $taskFile
-                            Write-Log "Downloading task file from: $taskFile"
-                            Invoke-WebRequest -Uri $taskFile -OutFile $tempTaskFile
-                            $taskFile = $tempTaskFile
-                        } else {
-                            throw "Invalid response code $($response.StatusCode)"
-                        }
 
-                        # Import the task using Register-ScheduledTask
-                        Write-SystemMessage -msg1 "- Importing task: " -msg2 $taskFile
-                        Write-Log "Importing task: $taskFile"
-                        Register-ScheduledTask -TaskName $key -Xml (Get-Content $taskFile | Out-String) -Force
-                        Write-SystemMessage -msg1 "- Task $key imported successfully." -msg1Color "Green"
-                    } catch {
-                        Write-ErrorMessage -msg "The task file does not exist or is inaccessible: $taskFile"
-                        Write-Log "Error: The task file does not exist or is inaccessible: $($_.Exception.Message)"
-                        return
-                    }
+                    # Import the task using Register-ScheduledTask
+                    Write-SystemMessage -msg1 "- Importing task: " -msg2 $fileName
+                    Write-Log "Importing task: $fileName"
+
+                    Register-ScheduledTask -TaskName $key -Xml (Get-Content $tempTaskFile | Out-String) -Force
+
+                    Write-SuccessMessage -msg "Task $key imported successfully."
+                    Write-Log "Task $key imported successfully."
+                } catch {
+                    Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
+                    Write-Log "Error: Failed to import task ${taskFile}: $($_.Exception.Message)"
+                    return
                 }
             }
-            Write-Log "Scheduled Tasks imported successfully."
-            Write-SuccessMessage -msg "Scheduled tasks imported successfully."
-        } else {
-            Write-Log "No scheduled tasks to import. Missing configuration."
         }
+        Write-Log "Scheduled task(s) import complete."
+        Write-SuccessMessage -msg "Scheduled task(s) import complete."
     } catch {
-        Write-ErrorMessage -msg "Error importing tasks: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Error importing task(s): $($_.Exception.Message)"
         Write-Log "Error importing tasks: $($_.Exception.Message)"
         return
     }
 }
 
+# Function to bulk import tasks repository from github repository or zip file online
+function Import-TaskRepository {
+    try {
+        # Check if "Tasks" section and "TaskRepository" key is present in the configuration
+        $taskRepositoryUrl = Get-ConfigValue -section "Tasks" -key "TaskRepository"
+        if (-not $taskRepositoryUrl) {
+            Write-Log "No task repository specified. Missing configuration."
+            return
+        }
+
+        Write-SystemMessage -title "Importing Task Repository"
+        Write-Log "Starting task repository import from $taskRepositoryUrl"
+
+        # Set up a temporary folder to store the task files
+        $tempFolder = "$env:TEMP\TaskRepository"
+        if (-not (Test-Path $tempFolder)) {
+            New-Item -ItemType Directory -Path $tempFolder | Out-Null
+        }
+
+        # Check if the repository is hosted on GitHub
+        if ($taskRepositoryUrl -match "github.com") {
+            # Handle GitHub repositories
+            Write-Log "Detected GitHub repository. Downloading task files from GitHub..."
+            Write-SystemMessage -msg1 "- Downloading task files from GitHub repository."
+
+            $response = Invoke-WebRequest -Uri $taskRepositoryUrl -UseBasicParsing
+
+            # Fetch the XML task files from GitHub
+            $xmlFileLinks = $response.Links | Where-Object { $_.href -match "\.xml$" }
+
+            foreach ($link in $xmlFileLinks) {
+                $fileUrl = "https://github.com" + $link.href.Replace("/blob/", "/raw/")
+                $fileName = Split-Path -Leaf $fileUrl
+                $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
+
+                Write-Log "Downloading $fileName from: $fileUrl"
+                Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
+
+                Write-Log "$fileName downloaded successfully."
+            }
+        } elseif ($taskRepositoryUrl -match "\.zip$") {
+            # Handle ZIP files from other sources
+            Write-Log "Detected ZIP file repository. Downloading and extracting..."
+            Write-SystemMessage -msg1 "- Downloading and extracting ZIP repository."
+
+            $zipFile = "$env:TEMP\taskrepository.zip"
+            Invoke-WebRequest -Uri $taskRepositoryUrl -OutFile $zipFile
+            Expand-Archive -Path $zipFile -DestinationPath $tempFolder -Force
+            Remove-Item $zipFile
+
+            Write-Log "ZIP file extracted to $tempFolder."
+        } else {
+            Write-Log "Unsupported repository format. Only GitHub or ZIP repositories are supported."
+            Write-ErrorMessage -msg "Unsupported task repository format."
+            return
+        }
+
+        # Import all the downloaded/extracted XML task files
+        $xmlTaskFiles = Get-ChildItem -Path $tempFolder -Filter *.xml
+        foreach ($taskFile in $xmlTaskFiles) {
+            Write-Log "Importing task from: $($taskFile.FullName)"
+            try {
+                Register-ScheduledTask -Xml (Get-Content $taskFile.FullName | Out-String) -TaskName $taskFile.BaseName -Force
+                Write-SystemMessage -msg1 "- Task $($taskFile.BaseName) imported successfully." -msg1Color "Green"
+                Write-Log "Task $($taskFile.BaseName) imported successfully."
+            } catch {
+                Write-Log "Failed to import task ${taskFile.FullName}: $($_.Exception.Message)"
+                Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
+            }
+        }
+
+        # Clean up the temporary folder
+        Write-Log "Task repository import completed. Cleaning up..."
+        Remove-Item -Path $tempFolder -Recurse -Force
+
+        Write-SuccessMessage -msg "Task repository imported and cleaned up successfully."
+    } catch {
+        Write-ErrorMessage -msg "Error importing task repository: $($_.Exception.Message)"
+        Write-Log "Error importing task repository: $($_.Exception.Message)"
+        return
+    }
+}
 
 # Function to activate Windows
 function Activate-Windows {
@@ -1941,6 +1992,7 @@ Install-Office
 Add-RegistryEntries
 Remove-RegistryEntries
 Import-Tasks
+Import-TaskRepository
 Activate-Windows
 
 
