@@ -2,6 +2,8 @@
 
 ## Changes
 - Merge wallpaper and lockscreen functions under the Set-ThemeSettings function
+- Move TaskbarAlignment="Left" to TASKBAR section
+
 
 # BUGFIXES
 [] Fix the Import-TasksRepository function to get it working. Look at the Get-Fonts function that works the same to rebuild from ground up.
