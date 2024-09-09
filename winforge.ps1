@@ -1870,21 +1870,21 @@ function Import-TaskRepository {
             Write-Log "Detected GitHub repository. Downloading task files from GitHub..."
             Write-SystemMessage -msg1 "- Downloading task files from GitHub repository."
 
-            # GitHub raw URL and file download logic
-            $response = Invoke-WebRequest -Uri $taskRepositoryUrl -UseBasicParsing
-            $taskFileLinks = $response.Links | Where-Object { $_.href -match "\.xml$" }
+            $taskFilesPage = Invoke-WebRequest -Uri $taskRepositoryUrl -UseBasicParsing
+
+            # Fetch the XML task files from GitHub
+            $taskFileLinks = $taskFilesPage.Links | Where-Object { $_.href -match "\.xml$" }
 
             foreach ($link in $taskFileLinks) {
                 $fileUrl = "https://github.com" + $link.href.Replace("/blob/", "/raw/")
-                $fileName = Split-Path -Leaf $fileUrl
-                $downloadedFile = Join-Path -Path $tempFolder -ChildPath $fileName
+                $fileName = [System.IO.Path]::GetFileName($link.href)
 
+                # Download each task XML file
                 Write-Log "Downloading $fileName from: $fileUrl"
-                Invoke-WebRequest -Uri $fileUrl -OutFile $downloadedFile
+                Invoke-WebRequest -Uri $fileUrl -OutFile (Join-Path -Path $tempFolder -ChildPath $fileName)
 
                 Write-Log "$fileName downloaded successfully."
             }
-
         } elseif ($taskRepositoryUrl -match "\.zip$") {
             # Handle ZIP files from other sources
             Write-Log "Detected ZIP file repository. Downloading and extracting..."
@@ -1927,6 +1927,7 @@ function Import-TaskRepository {
         return
     }
 }
+
 
 
 # Function to activate Windows
