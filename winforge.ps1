@@ -648,6 +648,13 @@ function Install-Fonts {
 
 # Function to install Microsoft Office
 function Install-Office {
+
+    # Guard clause to check if the "Office" section exists
+    if (-not $config.ContainsKey("Office")) {
+        Write-Log "Office section not found in the config. Skipping Office settings configuration."
+        return
+    }
+    
     try {
         $officeSectionExists = $config.ContainsKey("Office")
         if ($officeSectionExists) {
@@ -732,6 +739,13 @@ function Install-Office {
 
 # Function to configure Taskbar Features
 function Set-TaskbarFeatures {
+
+    # Guard clause to check if the "Taskbar" section exists
+    if (-not $config.ContainsKey("Taskbar")) {
+        Write-Log "Taskbar section not found in the config. Skipping Taskbar settings configuration."
+        return
+    }
+    
     Write-SystemMessage -title "Applying Taskbar Features"
 
     # Disable 'Meet Now' icon on Taskbar
@@ -831,6 +845,13 @@ function Set-TaskbarFeatures {
 
 # Function to configure the Theme Settings
 function Set-ThemeSettings {
+
+    # Guard clause to check if the "Theme" section exists
+    if (-not $config.ContainsKey("Theme")) {
+        Write-Log "Theme section not found in the config. Skipping Theme settings configuration."
+        return
+    }
+
     Write-SystemMessage -title "Applying Theme Settings"
 
     # Enable Dark Mode (TRUE or FALSE)
@@ -963,6 +984,13 @@ function Set-ThemeSettings {
 
 
 function Set-Tweaks {
+    
+    # Guard clause to check if the "Tweaks" section exists
+    if (-not $config.ContainsKey("Tweaks")) {
+        Write-Log "Tweaks section not found in the config. Skipping Tweaks settings configuration."
+        return
+    }
+
     Write-SystemMessage -title "Applying Tweaks"
 
     # Enable Classic Right-Click Menu (Windows 10 Style)
@@ -1241,10 +1269,9 @@ function Set-PowerSettings {
 # Function to configure Windows updates
 function Set-WindowsUpdates {
 
-    $setWindowsUpdates = Get-ConfigValue -section "WindowsUpdate"
-
-    if (!$setWindowsUpdates) {
-        Return
+    if (-not (Get-ConfigValue -section "WindowsUpdate")) {
+        Write-Log "WindowsUpdate section not found in the config. Skipping WindowsUpdate settings configuration."
+        return
     }
 
     try {
