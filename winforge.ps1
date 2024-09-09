@@ -884,6 +884,32 @@ function Set-TaskbarFeatures {
         Write-Log "Task View button not disabled. Skipping."
     }
 
+    # Set Taskbar Alignment (Left or Center)
+    $taskbarAlignment = Get-ConfigValue -section "Taskbar" -key "TaskbarAlignment"
+    if ($taskbarAlignment) {
+        Write-Log "Setting Taskbar Alignment to: $taskbarAlignment"
+        Write-SystemMessage -msg1 "- Setting Taskbar Alignment to: " -msg2 $taskbarAlignment
+        try {
+            switch ($taskbarAlignment) {
+                "Left"   { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force }
+                "Center" { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 1 -Force }
+                default {
+                    Write-Log "Invalid Taskbar Alignment: $taskbarAlignment. Skipping."
+                    return
+                }
+            }
+            Write-Log "Taskbar Alignment set to $taskbarAlignment."
+            # Restart explorer to apply the changes
+            Stop-Process -Name explorer -Force
+            Start-Process explorer
+        } catch {
+            Write-Log "Error setting Taskbar Alignment: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Taskbar Alignment."
+        }
+    } else {
+        Write-Log "Taskbar Alignment not set. Missing configuration."
+    }
+
     # Disable Search in Taskbar (online search)
     $disableSearch = Get-ConfigValue -section "Taskbar" -key "DisableSearch"
     if ($disableSearch -eq "TRUE") {
@@ -940,31 +966,7 @@ function Set-ThemeSettings {
         Write-Log "Transparency Effects not set. Missing configuration."
     }
 
-    # Set Taskbar Alignment (Left or Center)
-    $taskbarAlignment = Get-ConfigValue -section "Theme" -key "TaskbarAlignment"
-    if ($taskbarAlignment) {
-        Write-Log "Setting Taskbar Alignment to: $taskbarAlignment"
-        Write-SystemMessage -msg1 "- Setting Taskbar Alignment to: " -msg2 $taskbarAlignment
-        try {
-            switch ($taskbarAlignment) {
-                "Left"   { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force }
-                "Center" { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 1 -Force }
-                default {
-                    Write-Log "Invalid Taskbar Alignment: $taskbarAlignment. Skipping."
-                    return
-                }
-            }
-            Write-Log "Taskbar Alignment set to $taskbarAlignment."
-            # Restart explorer to apply the changes
-            Stop-Process -Name explorer -Force
-            Start-Process explorer
-        } catch {
-            Write-Log "Error setting Taskbar Alignment: $($_.Exception.Message)"
-            Write-ErrorMessage -msg "Failed to set Taskbar Alignment."
-        }
-    } else {
-        Write-Log "Taskbar Alignment not set. Missing configuration."
-    }
+    
 
     # Set Desktop Icon Size
     $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
@@ -1825,11 +1827,11 @@ function Import-Tasks {
 
                     Register-ScheduledTask -TaskName $key -Xml (Get-Content $tempTaskFile | Out-String) -Force | Out-Null
 
-                    Write-SuccessMessage -msg "Task $key imported successfully."
-                    Write-Log "Task $fileName imported successfully."
+                    Write-SystemMessage -msg "- Successfully imported task:" -msg2 "$fileName"
+                    Write-Log "Successfully imported task: $fileName"
                 }
                 catch {
-                    Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
+                    Write-ErrorMessage -msg "Failed to import task: $fileName - $($_.Exception.Message)"
                     Write-Log "Error: Failed to import task ${taskFile}: $($_.Exception.Message)"
                     return
                 }
@@ -1907,9 +1909,9 @@ function Import-TaskRepository {
         foreach ($taskFile in $xmlTaskFiles) {
             Write-Log "Importing task from: $($taskFile.FullName)"
             try {
-                Register-ScheduledTask -Xml (Get-Content $taskFile.FullName | Out-String) -TaskName $taskFile.BaseName -Force
-                Write-SystemMessage -msg1 "- Task $($taskFile.BaseName) imported successfully." -msg1Color "Green"
-                Write-Log "Task $($taskFile.BaseName) imported successfully."
+                Register-ScheduledTask -Xml (Get-Content $taskFile.FullName | Out-String) -TaskName $taskFile.BaseName -Force | Out-Null
+                Write-SystemMessage -msg1 "- Successfully imported task:" -msg2 "$($taskFile.BaseName)" 
+                Write-Log "Successfully imported task: $($taskFile.BaseName)."
             } catch {
                 Write-Log "Failed to import task ${taskFile.FullName}: $($_.Exception.Message)"
                 Write-ErrorMessage -msg "Failed to import task: $($_.Exception.Message)"
@@ -1920,7 +1922,7 @@ function Import-TaskRepository {
         Write-Log "Task repository import completed. Cleaning up..."
         Remove-Item -Path $tempFolder -Recurse -Force
 
-        Write-SuccessMessage -msg "Task repository imported and cleaned up successfully."
+        Write-SuccessMessage -msg "Task repository imported into task scheduler."
     } catch {
         Write-ErrorMessage -msg "Error importing task repository: $($_.Exception.Message)"
         Write-Log "Error importing task repository: $($_.Exception.Message)"
