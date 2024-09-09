@@ -730,108 +730,6 @@ function Install-Office {
     }
 }
 
-# Function to set wallpaper
-function Set-Wallpaper {
-    try {
-        $wallpaperPath = Get-ConfigValue -section "Theme" -key "WallpaperPath"
-        if ($wallpaperPath) {
-            Write-SystemMessage -title "Setting Wallpaper"
-            Write-Log "Setting wallpaper..."
-
-            # Check if the path is a URL
-            if ($wallpaperPath -match "^https?://") {
-                $tempWallpaperPath = "$env:TEMP\wallpaper.jpg"
-                Write-Log "Downloading wallpaper from: $wallpaperPath"
-                Write-SystemMessage -msg1 "Downloading wallpaper from: " -msg2 $wallpaperPath
-                Invoke-WebRequest -Uri $wallpaperPath -OutFile $tempWallpaperPath
-                $wallpaperPath = $tempWallpaperPath
-            }
-
-            $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion"
-            $registryKey = "PersonalizationCSP"
-            $registryFullPath = "$registryPath\$registryKey"
-
-            if (!(Test-Path $registryFullPath)) {
-                New-Item -Path "$registryPath" -Name "$registryKey"
-            }
-
-            $registryItems = @(
-                [pscustomobject]@{ Name = "DesktopImagePath"; Value = $wallpaperPath; Type = "String" }
-                [pscustomobject]@{ Name = "DesktopImageUrl"; Value = $wallpaperPath; Type = "String" }
-                [pscustomobject]@{ Name = "DesktopImageStatus"; Value = "1"; Type = "DWORD" }
-            )
-
-            foreach ($item in $registryItems) {
-                New-ItemProperty -Path $registryFullPath -Name $item.Name -Value $item.Value -PropertyType $item.Type -Force | Out-Null
-            }
-
-            Stop-Process -Name explorer
-            Start-Sleep -Seconds 5
-            if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
-
-            Write-Log "Wallpaper set successfully."
-            Write-SuccessMessage -msg "Wallpaper set successfully."
-        } else {
-            Write-Log "Wallpaper not set. Missing configuration."
-        }
-    } catch {
-        Write-Log "Error setting wallpaper: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error setting wallpaper: $($_.Exception.Message)"
-        Return
-    }
-}
-
-# Function to set lock screen image
-function Set-LockScreenImage {
-    try {
-        $lockScreenPath = Get-ConfigValue -section "Theme" -key "LockScreenPath"
-        if ($lockScreenPath) {
-            Write-SystemMessage -title "Setting Lock Screen Image"
-            Write-Log "Setting lock screen image..."
-
-            # Check if the path is a URL
-            if ($lockScreenPath -match "^https?://") {
-                $tempLockScreenPath = "$env:TEMP\lockscreen.jpg"
-                Write-Log "Downloading lock screen image from: $lockScreenPath"
-                Write-SystemMessage -msg1 "Downloading lock screen image from: " -msg2 $lockScreenPath
-                Invoke-WebRequest -Uri $lockScreenPath -OutFile $tempLockScreenPath
-                $lockScreenPath = $tempLockScreenPath
-            }
-
-            $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion"
-            $registryKey = "PersonalizationCSP"
-            $registryFullPath = "$registryPath\$registryKey"
-
-            if (!(Test-Path $registryFullPath)) {
-                New-Item -Path "$registryPath" -Name "$registryKey" | Out-Null
-            }
-
-            $registryItems = @(
-                [pscustomobject]@{ Name = "LockScreenImagePath"; Value = $lockScreenPath; Type = "String" }
-                [pscustomobject]@{ Name = "LockScreenImageUrl"; Value = $lockScreenPath; Type = "String" }
-                [pscustomobject]@{ Name = "LockScreenImageStatus"; Value = "1"; Type = "DWORD" }
-            )
-
-            foreach ($item in $registryItems) {
-                New-ItemProperty -Path $registryFullPath -Name $item.Name -Value $item.Value -PropertyType $item.Type -Force | Out-Null
-            }
-
-            Stop-Process -Name explorer
-            Start-Sleep -Seconds 5
-            if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
-
-            Write-Log "Lock screen image set successfully."
-            Write-SuccessMessage -msg "Lock screen image set successfully."
-        } else {
-            Write-Log "Lock screen image not set. Missing configuration."
-        }
-    } catch {
-        Write-Log "Error setting lock screen image: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error setting lock screen image: $($_.Exception.Message)"
-        Return
-    }
-}
-
 # Function to configure Taskbar Features
 function Set-TaskbarFeatures {
     Write-SystemMessage -title "Applying Taskbar Features"
@@ -931,6 +829,7 @@ function Set-TaskbarFeatures {
     Write-SuccessMessage -msg "Taskbar features applied successfully."
 }
 
+# Function to configure the Theme Settings
 function Set-ThemeSettings {
     Write-SystemMessage -title "Applying Theme Settings"
 
@@ -966,15 +865,12 @@ function Set-ThemeSettings {
         Write-Log "Transparency Effects not set. Missing configuration."
     }
 
-    
-
     # Set Desktop Icon Size
     $desktopIconSize = Get-ConfigValue -section "Theme" -key "DesktopIconSize"
     if ($desktopIconSize) {
         Write-Log "Setting Desktop Icon Size to: $desktopIconSize"
         Write-SystemMessage -msg1 "- Setting Desktop Icon Size to: " -msg2 $desktopIconSize
         
-        # Switch based on the size selected
         switch ($desktopIconSize) {
             "Small" { $iconSizeValue = 32 }
             "Medium" { $iconSizeValue = 48 }
@@ -986,7 +882,6 @@ function Set-ThemeSettings {
         }
         
         try {
-            # Apply icon size in the correct registry path
             New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -Name "IconSize" -Value $iconSizeValue -PropertyType DWord -Force | Out-Null
             Write-Log "Desktop Icon Size set to $desktopIconSize ($iconSizeValue)."
         } catch {
@@ -996,7 +891,67 @@ function Set-ThemeSettings {
     } else {
         Write-Log "Desktop Icon Size not set. Missing configuration."
     }
-    
+
+    # Set Wallpaper
+    $wallpaperPath = Get-ConfigValue -section "Theme" -key "WallpaperPath"
+    if ($wallpaperPath) {
+        Write-Log "Setting wallpaper to: $wallpaperPath"
+        Write-SystemMessage -msg1 "- Setting wallpaper to: " -msg2 $wallpaperPath
+
+        if ($wallpaperPath -match "^https?://") {
+            $tempWallpaperPath = "$env:TEMP\wallpaper.jpg"
+            Write-Log "Downloading wallpaper from: $wallpaperPath"
+            Invoke-WebRequest -Uri $wallpaperPath -OutFile $tempWallpaperPath
+            $wallpaperPath = $tempWallpaperPath
+        }
+
+        try {
+            $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
+            if (!(Test-Path $registryPath)) { New-Item -Path $registryPath | Out-Null }
+
+            New-ItemProperty -Path $registryPath -Name "DesktopImagePath" -Value $wallpaperPath -PropertyType "String" -Force | Out-Null
+            New-ItemProperty -Path $registryPath -Name "DesktopImageUrl" -Value $wallpaperPath -PropertyType "String" -Force | Out-Null
+            New-ItemProperty -Path $registryPath -Name "DesktopImageStatus" -Value 1 -PropertyType "DWORD" -Force | Out-Null
+
+            Write-Log "Wallpaper set successfully."
+        } catch {
+            Write-Log "Error setting wallpaper: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set wallpaper."
+        }
+    } else {
+        Write-Log "Wallpaper not set. Missing configuration."
+    }
+
+    # Set Lock Screen Image
+    $lockScreenPath = Get-ConfigValue -section "Theme" -key "LockScreenPath"
+    if ($lockScreenPath) {
+        Write-Log "Setting lock screen image to: $lockScreenPath"
+        Write-SystemMessage -msg1 "- Setting lock screen image to: " -msg2 $lockScreenPath
+
+        if ($lockScreenPath -match "^https?://") {
+            $tempLockScreenPath = "$env:TEMP\lockscreen.jpg"
+            Write-Log "Downloading lock screen image from: $lockScreenPath"
+            Invoke-WebRequest -Uri $lockScreenPath -OutFile $tempLockScreenPath
+            $lockScreenPath = $tempLockScreenPath
+        }
+
+        try {
+            $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
+            if (!(Test-Path $registryPath)) { New-Item -Path $registryPath | Out-Null }
+
+            New-ItemProperty -Path $registryPath -Name "LockScreenImagePath" -Value $lockScreenPath -PropertyType "String" -Force | Out-Null
+            New-ItemProperty -Path $registryPath -Name "LockScreenImageUrl" -Value $lockScreenPath -PropertyType "String" -Force | Out-Null
+            New-ItemProperty -Path $registryPath -Name "LockScreenImageStatus" -Value 1 -PropertyType "DWORD" -Force | Out-Null
+
+            Write-Log "Lock screen image set successfully."
+        } catch {
+            Write-Log "Error setting lock screen image: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set lock screen image."
+        }
+    } else {
+        Write-Log "Lock screen image not set. Missing configuration."
+    }
+
     # Restart Explorer for settings to take effect
     Stop-Process -Name explorer
     Start-Sleep -Seconds 5
@@ -1005,6 +960,7 @@ function Set-ThemeSettings {
     Write-Log "Theme Settings configuration completed."
     Write-SuccessMessage -msg "Theme Settings applied successfully."
 }
+
 
 function Set-Tweaks {
     Write-SystemMessage -title "Applying Tweaks"
