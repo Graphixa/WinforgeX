@@ -1810,7 +1810,7 @@ function Import-Tasks {
 
                     Register-ScheduledTask -TaskName $key -Xml (Get-Content $tempTaskFile | Out-String) -Force | Out-Null
 
-                    Write-SystemMessage -msg "- Successfully imported task:" -msg2 "$fileName"
+                    Write-SystemMessage -msg1 "- Successfully imported task:" -msg2 "$fileName"
                     Write-Log "Successfully imported task: $fileName"
                 }
                 catch {
@@ -1971,8 +1971,6 @@ Set-SystemTimezone
 Set-TaskbarFeatures
 Set-PrivacySettings
 Set-Tweaks
-Set-Wallpaper
-Set-LockScreenImage
 Set-ThemeSettings
 Set-SecuritySettings
 Set-WindowsUpdates
