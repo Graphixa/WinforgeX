@@ -2002,8 +2002,8 @@ Install-GoogleDrive
 Install-Office
 Add-RegistryEntries
 Remove-RegistryEntries
-Import-Tasks
 Import-TaskRepository
+Import-Tasks
 Activate-Windows
 
 
