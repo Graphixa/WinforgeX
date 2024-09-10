@@ -1242,28 +1242,68 @@ function Remove-RegistryEntries {
 
 # Function to configure power settings
 function Set-PowerSettings {
-    try {
-        $powerPlan = Get-ConfigValue -section "PowerSettings" -key "PowerPlan"
-        $sleepTimeout = Get-ConfigValue -section "PowerSettings" -key "SleepTimeout"
-        $hibernateTimeout = Get-ConfigValue -section "PowerSettings" -key "HibernateTimeout"
+    Write-SystemMessage -title "Configuring Power Settings"
 
-        if ($powerPlan) {
-            Write-Log "Configuring power settings..."
-            powercfg -setactive $powerPlan
-            if ($sleepTimeout) {
-                powercfg -change -monitor-timeout-ac $sleepTimeout
+    # Set Power Plan
+    $powerPlan = Get-ConfigValue -section "PowerSettings" -key "PowerPlan"
+    if ($powerPlan) {
+        Write-Log "Setting Power Plan to: $powerPlan"
+        Write-SystemMessage -msg1 "- Setting Power Plan to: " -msg2 $powerPlan
+
+        try {
+            # Map the power plan name to the system power plan using WMI
+            $changePowerPlan = Get-WmiObject -Namespace root\cimv2\power -Class Win32_PowerPlan -Filter "ElementName = '$powerPlan'"
+            if ($changePowerPlan) {
+                $changePowerPlan.Activate()
+                Write-Log "Power Plan set to: $powerPlan"
+                Write-SuccessMessage -msg "Power Plan set to: $powerPlan"
+            } else {
+                Write-Log "Error: Power plan $powerPlan not found."
+                Write-ErrorMessage -msg "Power Plan not found: $powerPlan"
             }
-            if ($hibernateTimeout) {
-                powercfg -change -standby-timeout-ac $hibernateTimeout
-            }
-            Write-Log "Power settings configured successfully."
-        } else {
-            Write-Log "Power settings not set. Missing configuration."
+        } catch {
+            Write-Log "Error setting Power Plan: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Power Plan."
         }
-    } catch {
-        Write-Log "Error configuring power settings: $($_.Exception.Message)"
-        Return
+    } else {
+        Write-Log "Power Plan not set. Missing configuration."
     }
+
+    # Set Sleep Timeout
+    $sleepTimeout = Get-ConfigValue -section "PowerSettings" -key "SleepTimeout"
+    if ($sleepTimeout) {
+        Write-Log "Setting Sleep Timeout to: $sleepTimeout minutes"
+        Write-SystemMessage -msg1 "- Setting Sleep Timeout to: " -msg2 "$sleepTimeout minutes"
+        try {
+            powercfg -change -monitor-timeout-ac $sleepTimeout
+            Write-Log "Sleep Timeout set to: $sleepTimeout minutes"
+            Write-SuccessMessage -msg "Sleep Timeout set to: $sleepTimeout minutes"
+        } catch {
+            Write-Log "Error setting Sleep Timeout: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Sleep Timeout."
+        }
+    } else {
+        Write-Log "Sleep Timeout not set. Missing configuration."
+    }
+
+    # Set Hibernate Timeout
+    $hibernateTimeout = Get-ConfigValue -section "PowerSettings" -key "HibernateTimeout"
+    if ($hibernateTimeout) {
+        Write-Log "Setting Hibernate Timeout to: $hibernateTimeout minutes"
+        Write-SystemMessage -msg1 "- Setting Hibernate Timeout to: " -msg2 "$hibernateTimeout minutes"
+        try {
+            powercfg -change -standby-timeout-ac $hibernateTimeout
+            Write-Log "Hibernate Timeout set to: $hibernateTimeout minutes"
+            Write-SuccessMessage -msg "Hibernate Timeout set to: $hibernateTimeout minutes"
+        } catch {
+            Write-Log "Error setting Hibernate Timeout: $($_.Exception.Message)"
+            Write-ErrorMessage -msg "Failed to set Hibernate Timeout."
+        }
+    } else {
+        Write-Log "Hibernate Timeout not set. Missing configuration."
+    }
+
+    Write-Log "Power settings configuration completed."
 }
 
 # Function to configure Windows updates
