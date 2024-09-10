@@ -1242,6 +1242,13 @@ function Remove-RegistryEntries {
 
 # Function to configure power settings
 function Set-PowerSettings {
+    
+    # Guard clause to check if the "PowerSettings" section exists
+    if (-not $config.ContainsKey("PowerSettings")) {
+        Write-Log "PowerSettings section not found in the config. Skipping PowerSettings settings configuration."
+        return
+    }
+
     Write-SystemMessage -title "Configuring Power Settings"
 
     # Set Power Plan
@@ -1309,10 +1316,12 @@ function Set-PowerSettings {
 # Function to configure Windows updates
 function Set-WindowsUpdates {
 
-    if (-not (Get-ConfigValue -section "WindowsUpdate")) {
+    # Guard clause to check if the "WindowsUpdate" section exists
+    if (-not $config.ContainsKey("WindowsUpdate")) {
         Write-Log "WindowsUpdate section not found in the config. Skipping WindowsUpdate settings configuration."
         return
     }
+
 
     try {
         $noAutoUpdate = Get-ConfigValue -section "WindowsUpdate" -key "NoAutoUpdate"
