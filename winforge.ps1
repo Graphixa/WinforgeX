@@ -1451,6 +1451,7 @@ function Set-SecuritySettings {
 
     # Guard clause to check if "Security" section exists in the config file
     if (-not $config.ContainsKey("Security")) {
+        Write-Log "Security section not found in the config. Skipping Security settings configuration."
         return
     }
 
@@ -1573,11 +1574,13 @@ function Set-Bitlocker {
     $bitlockerTarget = Get-ConfigValue -section "Security" -key "BitlockerTarget"
 
     if (-not $enableBitlocker) {
-        Write-Log "EnableBitlocker not set. Skipping BitLocker configuration."
+        Write-ErrorMessage "EnableBitlocker is set to false. Skipping BitLocker configuration."
+        Write-Log "EnableBitlocker is set to false. Skipping BitLocker configuration."
         return
     }
 
     if (-not $bitlockerTarget) {
+        Write-ErrorMessage "BitlockerTarget not set in config file. Skipping BitLocker configuration."
         Write-Log "BitlockerTarget not set. Skipping BitLocker configuration."
         return
     }
