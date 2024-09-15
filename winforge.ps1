@@ -185,17 +185,17 @@ function Write-SuccessMessage {
     Write-Host
   }
 
-# Function to add, modify, or remove registry settings
+# Function to add, modify, or remove registry settings.
 function RegistryTouch {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [ValidateSet("add", "remove")]
         [string]$action,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$path,
 
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory = $true)]
         [string]$name,
 
         [Parameter()]
@@ -203,43 +203,102 @@ function RegistryTouch {
         [string]$type = "String",  # Default to String
 
         [Parameter()]
-        [string]$value
+        [object]$value  # Changed to object to handle various data types
     )
 
     try {
-        if ($action -eq "add") {
-            # Check if the registry path exists, if not create it
-            if (-not (Test-Path $path)) {
-                Write-Log "Registry path does not exist. Creating path: $path"
-                New-Item -Path $path -Force -ErrorAction Stop
+        # Detect the base registry hive
+        switch -regex ($path) {
+            '^HKLM:\\|^HKEY_LOCAL_MACHINE\\' {
+                $baseKey = "HKLM:"
+                $pathWithoutHive = $path -replace '^HKLM:\\|^HKEY_LOCAL_MACHINE\\', ''
             }
+            '^HKCU:\\|^HKEY_CURRENT_USER\\' {
+                $baseKey = "HKCU:"
+                $pathWithoutHive = $path -replace '^HKCU:\\|^HKEY_CURRENT_USER\\', ''
+            }
+            '^HKCR:\\|^HKEY_CLASSES_ROOT\\' {
+                $baseKey = "HKCR:"
+                $pathWithoutHive = $path -replace '^HKCR:\\|^HKEY_CLASSES_ROOT\\', ''
+            }
+            '^HKU:\\|^HKEY_USERS\\' {
+                $baseKey = "HKU:"
+                $pathWithoutHive = $path -replace '^HKU:\\|^HKEY_USERS\\', ''
+            }
+            '^HKCC:\\|^HKEY_CURRENT_CONFIG\\' {
+                $baseKey = "HKCC:"
+                $pathWithoutHive = $path -replace '^HKCC:\\|^HKEY_CURRENT_CONFIG\\', ''
+            }
+            default {
+                Write-Log "Unsupported registry hive in path: $path"
+                Write-ErrorMessage -msg "Unsupported registry hive."
+                return
+            }
+        }
 
-            # Check if the registry item exists
-            if (-not (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue)) {
+        # Build the full registry path
+        $fullKeyPath = $baseKey
+        $subKeyParts = $pathWithoutHive -split "\\"
+
+        # Incrementally create any missing registry keys
+        foreach ($part in $subKeyParts) {
+            $fullKeyPath = Join-Path $fullKeyPath $part
+            if (-not (Test-Path $fullKeyPath)) {
+                Write-Log "Creating missing registry key: $fullKeyPath"
+                New-Item -Path $fullKeyPath -Force -ErrorAction Stop | Out-Null
+            }
+        }
+
+        # Now that all parent keys exist, handle the registry value
+        if ($action -eq "add") {
+            $itemExists = Get-ItemProperty -Path $fullKeyPath -Name $name -ErrorAction SilentlyContinue
+
+            if (-not $itemExists) {
                 Write-Log "Registry item does not exist. Creating item: $name with value: $value"
-                New-ItemProperty -Path $path -Name $name -Value $value -PropertyType $type -Force -ErrorAction Stop
+                New-ItemProperty -Path $fullKeyPath -Name $name -Value $value -PropertyType $type -Force -ErrorAction Stop | Out-Null
             } else {
-                # Check if the existing value is different
-                $currentValue = (Get-ItemProperty -Path $path -Name $name).$name
-                if ($currentValue -ne $value) {
+                # Retrieve the current value with proper data type handling
+                $currentValue = (Get-ItemProperty -Path $fullKeyPath -Name $name).$name
+
+                # Convert current value and new value to the appropriate types for comparison
+                switch ($type) {
+                    "DWord" {
+                        $currentValue = [int]$currentValue
+                        $value = [int]$value
+                    }
+                    "QWord" {
+                        $currentValue = [long]$currentValue
+                        $value = [long]$value
+                    }
+                    "Binary" {
+                        $currentValue = [Byte[]]$currentValue
+                        $value = [Byte[]]$value
+                    }
+                    default {
+                        $currentValue = [string]$currentValue
+                        $value = [string]$value
+                    }
+                }
+
+                if (-not ($currentValue -eq $value)) {
                     Write-Log "Registry value differs. Updating item: $name from $currentValue to $value"
-                    Set-ItemProperty -Path $path -Name $name -Value $value -Force -ErrorAction Stop
+                    Set-ItemProperty -Path $fullKeyPath -Name $name -Value $value -Force -ErrorAction Stop
                 } else {
                     Write-Log "Registry item: $name with value: $value already exists. Skipping."
                 }
             }
         } elseif ($action -eq "remove") {
-            # Check if the registry name exists
-            if (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue) {
-                Write-Log "Removing registry item: $name from path: $path"
-                Remove-ItemProperty -Path $path -Name $name -Force -ErrorAction Stop
+            # Check if the registry value exists
+            if (Get-ItemProperty -Path $fullKeyPath -Name $name -ErrorAction SilentlyContinue) {
+                Write-Log "Removing registry item: $name from path: $fullKeyPath"
+                Remove-ItemProperty -Path $fullKeyPath -Name $name -Force -ErrorAction Stop
             } else {
-                Write-Log "Registry item: $name does not exist at path: $path. Skipping."
+                Write-Log "Registry item: $name does not exist at path: $fullKeyPath. Skipping."
             }
         }
     } catch {
-        Write-Log "Error Modifying the Registry: $($_.Exception.Message)"
-        Write-ErrorMessage -msg "Error in Modifying the Registry: $($_.Exception.Message)"
+        Write-Log "Error modifying the registry: $($_.Exception.Message)"
+        Write-ErrorMessage -msg "Error modifying the registry: $($_.Exception.Message)"
     }
 }
 
@@ -346,8 +405,10 @@ function Set-DisableOneDrive {
             Write-Log "Disabling OneDrive."
             Write-SystemMessage -msg1 "- Disabling OneDrive."
             try {
-                # Registry changes to disable OneDrive
-                New-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1 -PropertyType DWord -Force | Out-Null
+                # Use RegistryTouch to disable OneDrive
+                RegistryTouch -action add -path "HKLM:\Software\Policies\Microsoft\Windows\OneDrive" -name "DisableFileSyncNGSC" -type "DWord" -value 1
+                
+                # Stop OneDrive process
                 Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
                 
                 Write-SuccessMessage -msg "OneDrive disabled."
@@ -364,7 +425,7 @@ function Set-DisableOneDrive {
         }
     } catch {
         Write-Log "Error in Set-DisableOneDrive function: $($_.Exception.Message)"
-        Return
+        return
     }
 }
 
@@ -377,8 +438,8 @@ function Set-DisableCopilot {
             Write-Log "Disabling Windows Copilot."
             Write-SystemMessage -msg1 "- Disabling Windows Copilot."
             try {
-                # Registry changes to disable Copilot
-                New-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "CopilotEnabled" -Value 0 -PropertyType DWord -Force | Out-Null
+                # Use RegistryTouch to disable Windows Copilot
+                RegistryTouch -action add -path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -name "CopilotEnabled" -type "DWord" -value 0
                 
                 Write-SuccessMessage -msg "Windows Copilot disabled."
                 Write-Log "Windows Copilot disabled successfully."
@@ -394,9 +455,10 @@ function Set-DisableCopilot {
         }
     } catch {
         Write-Log "Error in Set-DisableCopilot function: $($_.Exception.Message)"
-        Return
+        return
     }
 }
+
 
 # Function to test if a program is installed
 function Test-ProgramInstalled {
@@ -624,7 +686,13 @@ function Install-Fonts {
                 foreach ($font in $allFonts) {
                     $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
                     Copy-Item -Path $font.FullName -Destination $fontDestination -Force
-                    New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -PropertyType String -Force | Out-Null
+
+                    # Use RegistryTouch to register the font
+                    RegistryTouch -action add `
+                        -path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" `
+                        -name $font.BaseName `
+                        -value $font.Name `
+                        -type "String"
                 }
 
                 Write-Log "Font installed: $correctFontName"
@@ -635,7 +703,7 @@ function Install-Fonts {
             }
 
             Write-Log "All fonts installed successfully."
-            Write-SuccessMessage
+            Write-SuccessMessage -msg "All fonts installed successfully."
         } else {
             Write-Log "No fonts to install. Missing configuration."
         }
@@ -645,6 +713,7 @@ function Install-Fonts {
         Return
     }
 }
+
 
 # Function to install Microsoft Office
 function Install-Office {
@@ -754,7 +823,8 @@ function Set-TaskbarFeatures {
         Write-Log "Disabling 'Meet Now' icon on Taskbar."
         Write-SystemMessage -msg1 "- Disabling 'Meet Now' icon."
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "HideSCAMeetNow" -Value 1 -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to disable 'Meet Now'
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -name "HideSCAMeetNow" -type "DWord" -value 1
             Write-SuccessMessage -msg "'Meet Now' icon disabled."
         } catch {
             Write-Log "Error disabling 'Meet Now' icon: $($_.Exception.Message)"
@@ -770,7 +840,8 @@ function Set-TaskbarFeatures {
         Write-Log "Disabling Taskbar Widgets (Weather, News, etc.)."
         Write-SystemMessage -msg1 "- Disabling Taskbar Widgets."
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0 -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to disable Widgets
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "TaskbarDa" -type "DWord" -value 0
             Write-SuccessMessage -msg "Taskbar Widgets disabled."
         } catch {
             Write-Log "Error disabling Taskbar Widgets: $($_.Exception.Message)"
@@ -786,7 +857,8 @@ function Set-TaskbarFeatures {
         Write-Log "Disabling Task View button on Taskbar."
         Write-SystemMessage -msg1 "- Disabling Task View button."
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0 -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to disable Task View button
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "ShowTaskViewButton" -type "DWord" -value 0
             Write-SuccessMessage -msg "Task View button disabled."
         } catch {
             Write-Log "Error disabling Task View button: $($_.Exception.Message)"
@@ -803,8 +875,14 @@ function Set-TaskbarFeatures {
         Write-SystemMessage -msg1 "- Setting Taskbar Alignment to: " -msg2 $taskbarAlignment
         try {
             switch ($taskbarAlignment) {
-                "Left"   { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0 -Force }
-                "Center" { Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 1 -Force }
+                "Left" {
+                    # Use RegistryTouch to set alignment to Left
+                    RegistryTouch -action add -path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "TaskbarAl" -type "DWord" -value 0
+                }
+                "Center" {
+                    # Use RegistryTouch to set alignment to Center
+                    RegistryTouch -action add -path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "TaskbarAl" -type "DWord" -value 1
+                }
                 default {
                     Write-Log "Invalid Taskbar Alignment: $taskbarAlignment. Skipping."
                     return
@@ -828,8 +906,9 @@ function Set-TaskbarFeatures {
         Write-Log "Disabling online Search in Taskbar."
         Write-SystemMessage -msg1 "- Disabling online Search in Taskbar."
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Value 0 -PropertyType DWord -Force | Out-Null
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "CortanaConsent" -Value 0 -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to disable Bing Search and Cortana
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -name "BingSearchEnabled" -type "DWord" -value 0
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -name "CortanaConsent" -type "DWord" -value 0
             Write-SuccessMessage -msg "Online Search disabled in Taskbar."
         } catch {
             Write-Log "Error disabling online Search in Taskbar: $($_.Exception.Message)"
@@ -842,6 +921,7 @@ function Set-TaskbarFeatures {
     Write-Log "Taskbar features configuration completed."
     Write-SuccessMessage -msg "Taskbar features applied successfully."
 }
+
 
 # Function to configure the Theme Settings
 function Set-ThemeSettings {
@@ -861,7 +941,8 @@ function Set-ThemeSettings {
         Write-Log "Setting Dark Mode to: $darkMode"
         Write-SystemMessage -msg1 "- Setting Dark Mode to: " -msg2 $darkMode
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value $modeValue -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to set the registry value
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -name "AppsUseLightTheme" -type "DWord" -value $modeValue
         } catch {
             Write-Log "Error setting Dark Mode: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to set Dark Mode."
@@ -877,7 +958,8 @@ function Set-ThemeSettings {
         Write-Log "Setting Transparency Effects to: $transparencyEffects"
         Write-SystemMessage -msg1 "- Setting Transparency Effects to: " -msg2 $transparencyEffects
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value $transparencyValue -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to set the registry value
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -name "EnableTransparency" -type "DWord" -value $transparencyValue
         } catch {
             Write-Log "Error setting Transparency Effects: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to set Transparency Effects."
@@ -903,7 +985,8 @@ function Set-ThemeSettings {
         }
         
         try {
-            New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -Name "IconSize" -Value $iconSizeValue -PropertyType DWord -Force | Out-Null
+            # Use RegistryTouch to set the registry value
+            RegistryTouch -action add -path "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop" -name "IconSize" -type "DWord" -value $iconSizeValue
             Write-Log "Desktop Icon Size set to $desktopIconSize ($iconSizeValue)."
         } catch {
             Write-Log "Error setting Desktop Icon Size: $($_.Exception.Message)"
@@ -928,12 +1011,10 @@ function Set-ThemeSettings {
 
         try {
             $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
-            if (!(Test-Path $registryPath)) { New-Item -Path $registryPath | Out-Null }
-
-            New-ItemProperty -Path $registryPath -Name "DesktopImagePath" -Value $wallpaperPath -PropertyType "String" -Force | Out-Null
-            New-ItemProperty -Path $registryPath -Name "DesktopImageUrl" -Value $wallpaperPath -PropertyType "String" -Force | Out-Null
-            New-ItemProperty -Path $registryPath -Name "DesktopImageStatus" -Value 1 -PropertyType "DWORD" -Force | Out-Null
-
+            # Use RegistryTouch to set the registry values
+            RegistryTouch -action add -path $registryPath -name "DesktopImagePath" -type "String" -value $wallpaperPath
+            RegistryTouch -action add -path $registryPath -name "DesktopImageUrl" -type "String" -value $wallpaperPath
+            RegistryTouch -action add -path $registryPath -name "DesktopImageStatus" -type "DWord" -value 1
             Write-Log "Wallpaper set successfully."
         } catch {
             Write-Log "Error setting wallpaper: $($_.Exception.Message)"
@@ -958,12 +1039,10 @@ function Set-ThemeSettings {
 
         try {
             $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
-            if (!(Test-Path $registryPath)) { New-Item -Path $registryPath | Out-Null }
-
-            New-ItemProperty -Path $registryPath -Name "LockScreenImagePath" -Value $lockScreenPath -PropertyType "String" -Force | Out-Null
-            New-ItemProperty -Path $registryPath -Name "LockScreenImageUrl" -Value $lockScreenPath -PropertyType "String" -Force | Out-Null
-            New-ItemProperty -Path $registryPath -Name "LockScreenImageStatus" -Value 1 -PropertyType "DWORD" -Force | Out-Null
-
+            # Use RegistryTouch to set the registry values
+            RegistryTouch -action add -path $registryPath -name "LockScreenImagePath" -type "String" -value $lockScreenPath
+            RegistryTouch -action add -path $registryPath -name "LockScreenImageUrl" -type "String" -value $lockScreenPath
+            RegistryTouch -action add -path $registryPath -name "LockScreenImageStatus" -type "DWord" -value 1
             Write-Log "Lock screen image set successfully."
         } catch {
             Write-Log "Error setting lock screen image: $($_.Exception.Message)"
@@ -974,7 +1053,7 @@ function Set-ThemeSettings {
     }
 
     # Restart Explorer for settings to take effect
-    Stop-Process -Name explorer
+    Stop-Process -Name explorer -Force
     Start-Sleep -Seconds 5
     if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) { Start-Process explorer }
 
@@ -982,9 +1061,9 @@ function Set-ThemeSettings {
     Write-SuccessMessage -msg "Theme Settings applied successfully."
 }
 
-
+# Function to configure System Tweaks
 function Set-Tweaks {
-    
+
     # Guard clause to check if the "Tweaks" section exists
     if (-not $config.ContainsKey("Tweaks")) {
         Write-Log "Tweaks section not found in the config. Skipping Tweaks settings configuration."
@@ -999,10 +1078,9 @@ function Set-Tweaks {
         Write-Log "Restoring Windows 10-style right-click menu."
         Write-SystemMessage -msg1 "- Enabling Windows 10-style right-click menu."
         try {
-            # Create the registry key and set its value
-            New-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -Force | Out-Null
-            New-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Force | Out-Null
-            Set-ItemProperty -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -Name "(Default)" -Value "" | Out-Null
+            # Use RegistryTouch to create the keys and set default values
+            RegistryTouch -action add -path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -name "(Default)" -type "String" -value ""
+            RegistryTouch -action add -path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" -name "(Default)" -type "String" -value ""
 
             # Restart explorer to apply changes
             Stop-Process -Name explorer -Force
@@ -1038,6 +1116,7 @@ function Set-Tweaks {
 
     Write-Log "Tweaks configuration completed."
 }
+
 
 # Function to configure Privacy settings
 function Set-PrivacySettings {
@@ -1133,7 +1212,6 @@ function Set-PrivacySettings {
 
     Write-SuccessMessage -msg "Privacy settings configured successfully."
 }
-
 
 # Function to add registry entries
 function Add-RegistryEntries {
@@ -1389,7 +1467,6 @@ function Set-WindowsUpdates {
         Return
     }
 }
-
 
 # Function to set optional windows features and services
 function Set-Services {
