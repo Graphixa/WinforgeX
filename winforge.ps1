@@ -16,6 +16,7 @@
 
     .EXAMPLE
     .\install.ps1 -config="https://www.github.com/Acme/Winforge/config.ini"
+    .\install.ps1 -config="https://drive.google.com/uc?export=download&id=1-92-Zs5q_v1Azxed0OY0VfxRHXPe4Xp1"
 
     Ensure that the script is run with administrative privileges to apply the configurations successfully.
 
