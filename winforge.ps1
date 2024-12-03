@@ -1011,13 +1011,28 @@ function Set-ThemeSettings {
         }
 
         try {
-            $registryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
-            # Use RegistryTouch to set the registry values
-            RegistryTouch -action add -path $registryPath -name "DesktopImagePath" -type "String" -value $wallpaperPath
-            RegistryTouch -action add -path $registryPath -name "DesktopImageUrl" -type "String" -value $wallpaperPath
-            RegistryTouch -action add -path $registryPath -name "DesktopImageStatus" -type "DWord" -value 1
+            $setwallpapersrc = @"
+using System.Runtime.InteropServices;
+
+public class Wallpaper
+{
+public const int SetDesktopWallpaper = 20;
+public const int UpdateIniFile = 0x01;
+public const int SendWinIniChange = 0x02;
+[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+private static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+public static void SetWallpaper(string path)
+{
+SystemParametersInfo(SetDesktopWallpaper, 0, path, UpdateIniFile | SendWinIniChange);
+}
+}
+"@
+            Add-Type -TypeDefinition $setwallpapersrc
+
+            [Wallpaper]::SetWallpaper($wallpaperPath)
             Write-Log "Wallpaper set successfully."
-        } catch {
+        }
+        catch {
             Write-Log "Error setting wallpaper: $($_.Exception.Message)"
             Write-ErrorMessage -msg "Failed to set wallpaper."
         }
