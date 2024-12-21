@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WinforgeConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <!-- System Configuration -->
+    <System>
+        <ComputerName>WINFORGE-PC</ComputerName>
+        <Locale>en-US</Locale>
+        <Timezone>UTC</Timezone>
+        <DisableWindowsStore>true</DisableWindowsStore>
+        <DisableOneDrive>true</DisableOneDrive>
+        <DisableCopilot>true</DisableCopilot>
+        <EnableRemoteDesktop>true</EnableRemoteDesktop>
+        <ShowFileExtensions>true</ShowFileExtensions>
+        <ShowHiddenFiles>true</ShowHiddenFiles>
+    </System>
+
+
+    <!-- Environment Variables -->
+    <EnvironmentVariables>
+        <CompanyName>Zebra Corp</CompanyName>
+        <Department>Stripes</Department>
+    </EnvironmentVariables>
+
+    <!-- Activation -->
+    <Activation>
+        <ProductKey>VK7JG-NPHTM-C97JM-9MPGT-3V66T</ProductKey>
+        <Version>Pro</Version>
+    </Activation>
+
+     <!-- Windows Update Configuration -->
+    <WindowsUpdate>
+        <NoAutoUpdate>false</NoAutoUpdate>
+        <AUOptions>4</AUOptions><!-- 2=Notify, 3=Auto DL, 4=Auto DL and Install -->
+        <AutoInstallMinorUpdates>true</AutoInstallMinorUpdates>
+        <ScheduledInstallDay>1</ScheduledInstallDay><!-- 0=Every Day, 1-7=Specific Day -->
+        <ScheduledInstallTime>3</ScheduledInstallTime><!-- 0-23 hours -->
+    </WindowsUpdate>
+
+    <!-- Taskbar Configuration -->
+    <Taskbar>
+        <TaskbarAlignment>Left</TaskbarAlignment>
+        <DisableMeetNow>true</DisableMeetNow>
+        <DisableWidgets>true</DisableWidgets>
+        <DisableTaskView>true</DisableTaskView>
+        <DisableSearch>true</DisableSearch>
+    </Taskbar>
+
+    <!-- Privacy Settings -->
+    <Privacy>
+        <DisableTelemetry>true</DisableTelemetry>
+        <DisableDiagTrack>true</DisableDiagTrack>
+        <DisableAppPrivacy>true</DisableAppPrivacy>
+        <DisablePersonalisedAdvertising>true</DisablePersonalisedAdvertising>
+        <DisableStartMenuTracking>true</DisableStartMenuTracking>
+        <DisableActivityHistory>true</DisableActivityHistory>
+        <DisableClipboardDataCollection>true</DisableClipboardDataCollection>
+        <DisableStartMenuSuggestions>true</DisableStartMenuSuggestions>
+    </Privacy>
+
+        <!-- Security Settings -->
+    <Security>
+        <DisableDefender>false</DisableDefender>
+        <DisableUAC>false</DisableUAC>
+        <UACLevel>Default</UACLevel><!-- Options: Default, AlwaysNotify, NeverNotify -->
+        <DisableSMB1>true</DisableSMB1>
+        <DisableAutoPlay>true</DisableAutoPlay>
+        <BitLocker>
+            <Enable>true</Enable>
+            <Target>C:</Target>
+        </BitLocker>
+    </Security>
+
+    <!-- Application Installation -->
+    <Applications>
+        <PackageManager>Chocolatey</PackageManager><!-- Options: Chocolatey, Winget -->
+        <ChocolateyApps>
+            <App>7zip</App>
+            <App>firefox</App>
+            <App Version="latest">vscode</App>
+        </ChocolateyApps>
+        <WingetApps>
+            <App ID="Microsoft.PowerToys" Version="latest"/>
+            <App ID="Microsoft.VisualStudioCode"/>
+        </WingetApps>
+        <InstallGoogleChrome>true</InstallGoogleChrome>
+        <InstallGoogleDrive>true</InstallGoogleDrive>
+    </Applications>
+
+    <!-- Fonts -->
+    <Fonts>
+        <Font>roboto</Font>
+        <Font>opensans</Font>
+        <Font>lato</Font>
+        <Font>firasans</Font>
+    </Fonts>
+
+
+
+
+    <!-- Power Settings -->
+    <Power>
+        <PowerPlan>Balanced</PowerPlan><!-- Options: Balanced, HighPerformance, PowerSaver -->
+        <DisableSleep>true</DisableSleep>
+        <DisableHibernate>true</DisableHibernate>
+        <DisableFastStartup>true</DisableFastStartup>
+        <MonitorTimeout>15</MonitorTimeout>
+        <SleepTimeout>30</SleepTimeout>
+        <HibernateTimeout>60</HibernateTimeout>
+    </Power>
+
+    <!-- Registry Modifications -->
+    <Registry>
+        <Add>
+            <Entry>
+                <Path>HKLM:\SOFTWARE\Policies\Microsoft\Windows\System</Path>
+                <Name>DisableLockScreenAppNotifications</Name>
+                <Type>DWord</Type>
+                <Value>1</Value>
+            </Entry>
+            <Entry>
+                <Path>HKLM:\SOFTWARE\Google\DriveFS</Path>
+                <Name>DefaultWebBrowser</Name>
+                <Type>String</Type>
+                <Value>$env:SystemDrive\Program Files\Google\Chrome\Application\chrome.exe</Value>
+            </Entry>
+        </Add>
+        <Remove>
+            <Entry>
+                <Path>HKLM:\SOFTWARE\Policies\Microsoft\Windows\System</Path>
+                <Name>DisableTaskMgr</Name>
+            </Entry>
+        </Remove>
+    </Registry>
+
+    <!-- Google Configuration -->
+    <Google>
+        <InstallGoogleDrive>true</InstallGoogleDrive>
+        <InstallGoogleChrome>true</InstallGoogleChrome>
+        <InstallGCPW>true</InstallGCPW>
+        <EnrollmentToken>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</EnrollmentToken>
+        <DomainsAllowedToLogin>example.com</DomainsAllowedToLogin>
+    </Google>
+
+
+    <!-- Office Configuration -->
+    <Office>
+        <LicenseKey>NMMKJ-6RK4F-KMJVX-8D9MJ-6MWKP</LicenseKey>
+        <ProductID>ProPlus2019Retail</ProductID>
+        <LanguageID>en-US</LanguageID>
+        <DisplayLevel>Full</DisplayLevel>
+        <SetupReboot>Never</SetupReboot>
+        <Channel>SemiAnnual</Channel>
+        <OfficeClientEdition>64</OfficeClientEdition>
+        <UpdatesEnabled>true</UpdatesEnabled>
+    </Office>
+
+    <!-- Theme Configuration -->
+    <Theme>
+        <DarkMode>true</DarkMode>
+        <DesktopIconSize>Medium</DesktopIconSize><!-- Options: Small, Medium, Large -->
+        <TransparencyEffects>true</TransparencyEffects>
+        <DisableWindowsAnimations>true</DisableWindowsAnimations>
+        <DisableTransparency>true</DisableTransparency>
+        <WallpaperPath>https://images.pexels.com/photos/2085998/pexels-photo-2085998.jpeg</WallpaperPath>
+        <LockScreenPath>https://images.pexels.com/photos/2341830/pexels-photo-2341830.jpeg</LockScreenPath>
+    </Theme>
+
+    <!-- System Tweaks -->
+    <Tweaks>
+        <ClassicRightClickMenu>true</ClassicRightClickMenu>
+        <EnableGodMode>true</EnableGodMode>
+    </Tweaks>
+
+    <!-- Network Configuration -->
+    <Network>
+        <NetworkDiscovery>true</NetworkDiscovery>
+        <FileAndPrinterSharing>true</FileAndPrinterSharing>
+        <NetworkDrives>
+            <Drive>
+                <Letter>S</Letter>
+                <Path>\\server\share</Path>
+            </Drive>
+        </NetworkDrives>
+    </Network>
+
+     <!-- Scheduled Tasks -->
+    <Tasks>
+        <Task>
+            <Name>AutoShutdown</Name>
+            <Path>https://raw.githubusercontent.com/Graphixa/WinforgeX/main/Tasks/AutoShutdown.xml</Path>
+        </Task>
+        <Task>
+            <Name>Task2</Name>
+            <Path>C:\Tasks\Task2.xml</Path>
+        </Task>
+        <Task>
+            <Name>Task3</Name>
+            <Path>\\NETWORKSHARE\TASKS\Task3.xml</Path>
+        </Task>
+        <TaskRepository>https://github.com/Graphixa/WinforgeX/tree/main/Tasks/</TaskRepository>
+    </Tasks>
+
+    <!-- Windows Features -->
+    <WindowsFeatures>
+        <Feature>
+            <Name>Microsoft-Hyper-V-All</Name>
+            <State>enabled</State>
+        </Feature>
+        <Feature>
+            <Name>Containers-DisposableClientVM</Name>
+            <State>enabled</State>
+        </Feature>
+        <Feature>
+            <Name>Microsoft-RemoteDesktopConnection</Name>
+            <State>enabled</State>
+        </Feature>
+        <Feature>
+            <Name>VirtualMachinePlatform</Name>
+            <State>enabled</State>
+        </Feature>
+        <Feature>
+            <Name>Microsoft-Windows-Subsystem-Linux</Name>
+            <State>enabled</State>
+        </Feature>
+        <Feature>
+            <Name>Containers</Name>
+            <State>enabled</State>
+        </Feature>
+    </WindowsFeatures>
+
+    <!-- File Operations -->
+    <Files>
+        <Copy>
+            <File>
+                <Source>\\server\share\file.txt</Source>
+                <Destination>C:\Local\file.txt</Destination>
+            </File>
+        </Copy>
+        <Delete>
+            <File>C:\Temp\oldfile.txt</File>
+        </Delete>
+    </Files>
+
+    <!-- Shortcuts -->
+    <Shortcuts>
+        <Shortcut>
+            <Name>Google Chrome</Name>
+            <Target>C:\Program Files\Google\Chrome\Application\chrome.exe</Target>
+            <Location>Desktop</Location>
+            <Arguments>--profile-directory=Default</Arguments>
+            <IconLocation>C:\Program Files\Google\Chrome\Application\chrome.exe,0</IconLocation>
+            <WorkingDirectory>C:\Program Files\Google\Chrome\Application</WorkingDirectory>
+        </Shortcut>
+    </Shortcuts>
+
+    <!-- Rest of the existing sections remain unchanged -->
+</WinforgeConfig>
