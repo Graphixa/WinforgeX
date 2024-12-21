@@ -884,7 +884,7 @@ function Set-ScheduledTasksConfiguration {
         Write-SystemMessage -Title "Configuring Scheduled Tasks"
 
         foreach ($task in $TasksConfig.Task) {
-            Write-Log "Processing task: $($task.Name)"
+            Write-Log "Importing task: $($task.Name)"
             
             # Download task XML if it's a URL
             if ($task.Path -match '^https?://') {
