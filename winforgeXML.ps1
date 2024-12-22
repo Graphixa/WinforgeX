@@ -1194,17 +1194,53 @@ function Set-RegistryEntries {
 
         # Process registry additions
         if ($RegistryConfig.Add) {
+            Write-SystemMessage -msg1 "- Processing registry additions..."
             foreach ($entry in $RegistryConfig.Add.Entry) {
-                Write-Log "Adding registry entry: $($entry.Path)\$($entry.Name)"
-                Set-RegistryModification -Action add -Path $entry.Path -Name $entry.Name -Type $entry.Type -Value $entry.Value
+                # Expand environment variables in the value
+                $expandedValue = $ExecutionContext.InvokeCommand.ExpandString($entry.Value)
+
+                Write-SystemMessage -msg1 "- Adding registry entry: " -msg2 "Path=$($entry.Path), Name=$($entry.Name)"
+                Write-Log "Adding registry entry: Path=$($entry.Path), Name=$($entry.Name), Type=$($entry.Type), Value=$expandedValue"
+
+                try {
+                    if (-not (Test-Path $entry.Path)) {
+                        New-Item -Path $entry.Path -Force | Out-Null
+                        Write-Log "Created registry path: $($entry.Path)"
+                    }
+
+                    Set-ItemProperty -Path $entry.Path -Name $entry.Name -Value $expandedValue -Type $entry.Type -Force
+                    Write-SuccessMessage -msg "Registry entry added successfully"
+                }
+                catch {
+                    Write-Log "Failed to add registry entry: $($_.Exception.Message)" -Level Error
+                    Write-ErrorMessage -msg "Failed to add registry entry: Path=$($entry.Path), Name=$($entry.Name)"
+                    continue
+                }
             }
         }
 
         # Process registry removals
         if ($RegistryConfig.Remove) {
+            Write-SystemMessage -msg1 "- Processing registry removals..."
             foreach ($entry in $RegistryConfig.Remove.Entry) {
-                Write-Log "Removing registry entry: $($entry.Path)\$($entry.Name)"
-                Set-RegistryModification -Action remove -Path $entry.Path -Name $entry.Name
+                Write-SystemMessage -msg1 "- Removing registry entry: " -msg2 "Path=$($entry.Path), Name=$($entry.Name)"
+                Write-Log "Removing registry entry: Path=$($entry.Path), Name=$($entry.Name)"
+
+                try {
+                    if (Test-Path $entry.Path) {
+                        Remove-ItemProperty -Path $entry.Path -Name $entry.Name -Force -ErrorAction Stop
+                        Write-SuccessMessage -msg "Registry entry removed successfully"
+                    }
+                    else {
+                        Write-Log "Registry path not found: $($entry.Path)" -Level Warning
+                        Write-ErrorMessage -msg "Registry path not found"
+                    }
+                }
+                catch {
+                    Write-Log "Failed to remove registry entry: $($_.Exception.Message)" -Level Error
+                    Write-ErrorMessage -msg "Failed to remove registry entry: Path=$($entry.Path), Name=$($entry.Name)"
+                    continue
+                }
             }
         }
 
@@ -1213,10 +1249,10 @@ function Set-RegistryEntries {
     }
     catch {
         Write-Log "Error modifying registry entries: $($_.Exception.Message)" -Level Error
+        Write-ErrorMessage -msg "Failed to modify registry entries"
         return $false
     }
 }
-
 function Set-WindowsFeaturesConfiguration {
     param (
         [Parameter(Mandatory = $true)]
