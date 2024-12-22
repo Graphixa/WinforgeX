@@ -142,22 +142,49 @@ function Test-XmlSchema {
     
     try {
         Write-Log "Attempting to load schema from: $script:schemaPath"
-        # Load and validate schema
-        $schemaReader = New-Object System.Xml.XmlTextReader $script:schemaPath
-        $schema = [System.Xml.Schema.XmlSchema]::Read($schemaReader, $null)
         
-        # Add validation event handler
-        $eventHandler = {
-            param($sender, $e)
-            Write-Log "XML Validation Error: $($e.Message)" -Level Error
-            Write-Log "Line: $($e.Exception.LineNumber), Position: $($e.Exception.LinePosition)" -Level Error
+        # Download schema if it's a URL
+        if ($script:schemaPath -match '^https?://') {
+            $tempSchemaPath = Join-Path $env:TEMP "schema.xsd"
+            Write-Log "Downloading schema to: $tempSchemaPath"
+            Invoke-WebRequest -Uri $script:schemaPath -OutFile $tempSchemaPath
+            $script:tempFiles += $tempSchemaPath
+            $schemaPath = $tempSchemaPath
+        } else {
+            $schemaPath = $script:schemaPath
         }
-        $Xml.Schemas.ValidationEventHandler += $eventHandler
+
+        # Verify schema file exists
+        if (-not (Test-Path $schemaPath)) {
+            throw "Schema file not found at: $schemaPath"
+        }
+
+        # Load schema
+        $schemaReader = New-Object System.Xml.XmlTextReader $schemaPath
+        $schema = [System.Xml.Schema.XmlSchema]::Read($schemaReader, {
+            param($sender, $e)
+            Write-Log "Schema Load Error: $($e.Message)" -Level Error
+        })
         
+        if ($null -eq $schema) {
+            throw "Failed to load schema"
+        }
+
+        # Add validation event handler
         $Xml.Schemas.Add($schema) | Out-Null
         
-        # Validate document
-        $Xml.Validate($null)
+        $validationErrors = @()
+        $Xml.Validate({
+            param($sender, $e)
+            $validationErrors += $e
+            Write-Log "XML Validation Error: $($e.Message)" -Level Error
+            Write-Log "Line: $($e.Exception.LineNumber), Position: $($e.Exception.LinePosition)" -Level Error
+        })
+
+        if ($validationErrors.Count -gt 0) {
+            throw "XML validation failed with $($validationErrors.Count) errors"
+        }
+
         return $true
     }
     catch {
