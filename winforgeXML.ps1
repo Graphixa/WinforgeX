@@ -176,7 +176,7 @@ function Get-XmlConfig {
         }
         
         # Load and validate XML
-        Write-SystemMessage -Title "Configuration" -Message "Loading configuration file..."
+        Write-SystemMessage -Title "Configuration" -msg1 "Loading configuration file..."
         [xml]$config = Get-Content -Path $Path
         
         if (-not (Test-XmlSchema -Xml $config)) {
