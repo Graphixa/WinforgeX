@@ -2606,8 +2606,10 @@ try {
 catch {
     Write-Log "$($_.Exception.Message)" -Level Error
     Write-ErrorMessage -msg "$($_.Exception.Message)"
+    Pause
     exit 1
 }
 finally {
     Remove-TempFiles
 }
+Pause
