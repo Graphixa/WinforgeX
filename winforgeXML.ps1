@@ -25,7 +25,7 @@ param (
     [string]$ConfigPath,
 
     [Parameter(Mandatory = $false)]
-    [string]$LogPath = "$env:TEMP\WinforgeXML.log"
+    [string]$LogPath = "$env:SystemDrive\Winforge.log"
 )
 
 # Script Variables
