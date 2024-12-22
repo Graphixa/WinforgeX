@@ -215,13 +215,9 @@ function Get-XmlConfig {
             $Path = $tempPath
         }
         
-        # Load and validate XML
+        # Load XML
         Write-SystemMessage -Title "Configuration" -msg1 "Loading configuration file..."
         [xml]$config = Get-Content -Path $Path
-        
-        if (-not (Test-XmlSchema -Xml $config)) {
-            throw "XML validation failed"
-        }
         
         return $config.WinforgeConfig
     }
