@@ -261,11 +261,15 @@ function Set-RegistryModification {
         }
         
         if ($Action -eq 'add') {
-            Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type $Type -Force
+            Set-ItemProperty -Path $Path -Name $Name -Value $Value -Type $Type -Force | Out-Null
+        }
+        elseif ($Action -eq 'remove') {
+            Remove-ItemProperty -Path $Path -Name $Name -Force -ErrorAction SilentlyContinue | Out-Null
         }
         else {
-            Remove-ItemProperty -Path $Path -Name $Name -Force -ErrorAction SilentlyContinue
+            throw "Invalid action: $Action"
         }
+
         return $true
     }
     catch {
@@ -1236,7 +1240,7 @@ function Get-Fonts {
             $outputFile = Join-Path -Path $outputPath -ChildPath $fileName
 
             Write-Log "Downloading $fileName"
-            Invoke-WebRequest -Uri $fileUrl -OutFile $outputFile
+            Invoke-WebRequest -Uri $fileUrl -OutFile $outputFile | Out-Null
             
             if (-not (Test-Path $outputFile)) {
                 throw "Failed to download $fileName"
@@ -1279,20 +1283,16 @@ function Install-Fonts {
 
             try {
                 # Download the font files
-                Get-Fonts -fontName $correctFontName -outputPath $tempDownloadFolder
+                Get-Fonts -fontName $correctFontName -outputPath $tempDownloadFolder | Out-Null
 
                 # Install the font files
                 $allFonts = Get-ChildItem -Path $tempDownloadFolder -Include *.ttf, *.otf -Recurse
                 foreach ($font in $allFonts) {
                     $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
-                    Copy-Item -Path $font.FullName -Destination $fontDestination -Force
+                    Copy-Item -Path $font.FullName -Destination $fontDestination -Force | Out-Null
 
                     # Register the font
-                    Set-RegistryModification -Action add `
-                        -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" `
-                        -Name $font.BaseName `
-                        -Value $font.Name `
-                        -Type String
+                    Set-RegistryModification -Action add -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -Type String
                 }
 
                 Write-Log "Font installed: $correctFontName"
@@ -1316,7 +1316,7 @@ function Install-Fonts {
     finally {
         $ProgressPreference = 'Continue'
         if (Test-Path $tempDownloadFolder) {
-            Remove-Item -Path $tempDownloadFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $tempDownloadFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
 }
@@ -1670,7 +1670,7 @@ function Set-WindowsFeaturesConfiguration {
                             Write-SystemMessage -msg1 "- Feature already enabled: " -msg2 $feature.Name
                             continue
                         }
-                        $result = Enable-WindowsOptionalFeature -Online -FeatureName $feature.Name -NoRestart
+                        $result = Enable-WindowsOptionalFeature -Online -FeatureName $feature.Name -NoRestart | Out-Null
                         if ($result.RestartNeeded) {
                             $script:restartRequired = $true
                             Write-Log "Restart will be required for feature: $($feature.Name)"
@@ -1685,7 +1685,7 @@ function Set-WindowsFeaturesConfiguration {
                             Write-SystemMessage -msg1 "- Feature already disabled: " -msg2 $feature.Name
                             continue
                         }
-                        $result = Disable-WindowsOptionalFeature -Online -FeatureName $feature.Name -NoRestart
+                        $result = Disable-WindowsOptionalFeature -Online -FeatureName $feature.Name -NoRestart | Out-Null
                         if ($result.RestartNeeded) {
                             $script:restartRequired = $true
                             Write-Log "Restart will be required for feature: $($feature.Name)"
@@ -1741,8 +1741,8 @@ function Set-GoogleConfiguration {
             $driveSetupPath = Join-Path $env:TEMP "GoogleDriveSetup.exe"
             $script:tempFiles += $driveSetupPath
             
-            Invoke-WebRequest -Uri $driveSetupUrl -OutFile $driveSetupPath
-            Start-Process -FilePath $driveSetupPath -ArgumentList "/silent /install" -Wait
+            Invoke-WebRequest -Uri $driveSetupUrl -OutFile $driveSetupPath | Out-Null
+            Start-Process -FilePath $driveSetupPath -ArgumentList "/silent /install" -Wait | Out-Null
             Write-SuccessMessage -msg "Google Drive installed successfully"
         } elseif ($GoogleConfig.InstallGoogleDrive -eq 'false') {
             Write-Log "Uninstalling Google Drive..."
@@ -1751,7 +1751,7 @@ function Set-GoogleConfiguration {
                 $uninstallString = (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" | 
                     Where-Object { $_.DisplayName -like "*Google Drive*" }).UninstallString
                 if ($uninstallString) {
-                    Start-Process -FilePath $uninstallString -ArgumentList "/silent /uninstall" -Wait
+                    Start-Process -FilePath $uninstallString -ArgumentList "/silent /uninstall" -Wait | Out-Null
                     Write-SuccessMessage -msg "Google Drive uninstalled successfully"
                 }
             } catch {
@@ -1769,8 +1769,8 @@ function Set-GoogleConfiguration {
             $chromeSetupPath = Join-Path $env:TEMP "chrome_installer.exe"
             $script:tempFiles += $chromeSetupPath
             
-            Invoke-WebRequest -Uri $chromeSetupUrl -OutFile $chromeSetupPath
-            Start-Process -FilePath $chromeSetupPath -ArgumentList "/silent /install" -Wait
+            Invoke-WebRequest -Uri $chromeSetupUrl -OutFile $chromeSetupPath | Out-Null
+            Start-Process -FilePath $chromeSetupPath -ArgumentList "/silent /install" -Wait | Out-Null
             Write-SuccessMessage -msg "Google Chrome installed successfully"
         } elseif ($GoogleConfig.InstallGoogleChrome -eq 'false') {
             Write-Log "Uninstalling Google Chrome..."
@@ -1779,7 +1779,7 @@ function Set-GoogleConfiguration {
                 $uninstallString = (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" | 
                     Where-Object { $_.DisplayName -like "*Google Chrome*" }).UninstallString
                 if ($uninstallString) {
-                    Start-Process -FilePath $uninstallString -ArgumentList "--uninstall --force-uninstall" -Wait
+                    Start-Process -FilePath $uninstallString -ArgumentList "--uninstall --force-uninstall" -Wait | Out-Null
                     Write-SuccessMessage -msg "Google Chrome uninstalled successfully"
                 }
             } catch {
@@ -1810,11 +1810,11 @@ function Set-GoogleConfiguration {
                 Write-Log "Installing Google Credential Provider for Windows (GCPW)..."
                 Write-SystemMessage -msg1 "- Installing: " -msg2 "Google Credential Provider for Windows (GCPW)"
                 
-                Invoke-WebRequest -Uri $gcpwUrl -OutFile "$env:TEMP\$gcpwFileName"
+                Invoke-WebRequest -Uri $gcpwUrl -OutFile "$env:TEMP\$gcpwFileName" | Out-Null
     
                 try {
                     $arguments = "/i ""$env:TEMP\$gcpwFileName"" /quiet"
-                    $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait
+                    $installProcess = Start-Process msiexec.exe -ArgumentList $arguments -PassThru -Wait | Out-Null
     
                     if ($installProcess.ExitCode -eq 0) {
                         Write-Log "GCPW Installation completed successfully!"
@@ -1847,7 +1847,7 @@ function Set-GoogleConfiguration {
                 $uninstallString = (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" | 
                     Where-Object { $_.DisplayName -like "*Google Credential Provider*" }).UninstallString
                 if ($uninstallString) {
-                    Start-Process msiexec.exe -ArgumentList "/x $uninstallString /quiet" -Wait
+                    Start-Process msiexec.exe -ArgumentList "/x $uninstallString /quiet" -Wait | Out-Null
                     Write-SuccessMessage -msg "GCPW uninstalled successfully"
                 }
             } catch {
@@ -1907,7 +1907,7 @@ function Set-OfficeConfiguration {
         $script:tempFiles += $odtPath
         
         try {
-            Invoke-WebRequest -Uri $odtUrl -OutFile $odtPath
+            Invoke-WebRequest -Uri $odtUrl -OutFile $odtPath | Out-Null
             Write-SuccessMessage -msg "Office Deployment Tool downloaded successfully"
         } catch {
             Write-Log "Failed to download Office Deployment Tool: $($_.Exception.Message)" -Level Error
@@ -1918,13 +1918,13 @@ function Set-OfficeConfiguration {
         # Extract ODT
         Write-SystemMessage -msg1 "- Extracting Office Deployment Tool..."
         Write-Log "Extracting Office Deployment Tool..."
-        Start-Process -FilePath $odtPath -ArgumentList "/quiet /extract:$env:TEMP\ODT" -Wait
+        Start-Process -FilePath $odtPath -ArgumentList "/quiet /extract:$env:TEMP\ODT" -Wait | Out-Null
 
         # Install Office
         Write-SystemMessage -msg1 "- Installing Microsoft Office..."
         Write-Log "Installing Microsoft Office..."
         $setupPath = Join-Path $env:TEMP "ODT\setup.exe"
-        Start-Process -FilePath $setupPath -ArgumentList "/configure `"$configPath`"" -Wait
+        Start-Process -FilePath $setupPath -ArgumentList "/configure `"$configPath`"" -Wait | Out-Null
 
         # Activate Office if license key provided
         if ($OfficeConfig.LicenseKey) {
@@ -1934,9 +1934,9 @@ function Set-OfficeConfiguration {
             $osppPath = "${env:ProgramFiles(x86)}\Microsoft Office\Office16\OSPP.VBS"
             if (Test-Path $osppPath) {
                 try {
-                    cscript $osppPath /inpkey:$($OfficeConfig.LicenseKey)
+                    cscript $osppPath /inpkey:$($OfficeConfig.LicenseKey) | Out-Null
                     Start-Sleep -Seconds 2
-                    cscript $osppPath /act
+                    cscript $osppPath /act | Out-Null
                     Write-SuccessMessage -msg "Microsoft Office activated successfully"
                 } catch {
                     Write-Log "Failed to activate Office: $($_.Exception.Message)" -Level Error
@@ -2109,7 +2109,7 @@ function Set-TweaksConfiguration {
             Write-Log "Disabling classic right-click menu..."
             Write-SystemMessage -msg1 "- Disabling classic right-click menu..."
             try {
-                Remove-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -Recurse -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path "HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
                 Write-SuccessMessage -msg "Classic right-click menu disabled"
             } catch {
                 Write-Log "Failed to disable classic right-click menu: $($_.Exception.Message)" -Level Error
@@ -2124,7 +2124,7 @@ function Set-TweaksConfiguration {
             try {
                 $godModePath = Join-Path $env:USERPROFILE "Desktop\GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}"
                 if (-not (Test-Path $godModePath)) {
-                    New-Item -Path $godModePath -ItemType Directory -Force
+                    New-Item -Path $godModePath -ItemType Directory -Force | Out-Null
                     Write-SuccessMessage -msg "God Mode folder created"
                 }
             } catch {
@@ -2137,7 +2137,7 @@ function Set-TweaksConfiguration {
             try {
                 $godModePath = Join-Path $env:USERPROFILE "Desktop\GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}"
                 if (Test-Path $godModePath) {
-                    Remove-Item -Path $godModePath -Force -Recurse
+                    Remove-Item -Path $godModePath -Force -Recurse | Out-Null
                     Write-SuccessMessage -msg "God Mode folder removed"
                 }
             } catch {
