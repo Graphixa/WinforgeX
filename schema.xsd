@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="WinforgeConfig">
+        <xs:complexType>
+            <xs:all>
+                <!-- System Configuration -->
+                <xs:element name="System" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="ComputerName" type="xs:string" minOccurs="0"/>
+                            <xs:element name="Locale" type="xs:string" minOccurs="0"/>
+                            <xs:element name="Timezone" type="xs:string" minOccurs="0"/>
+                            <xs:element name="DisableWindowsStore" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableOneDrive" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableCopilot" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="EnableRemoteDesktop" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="ShowFileExtensions" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="ShowHiddenFiles" type="xs:boolean" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Environment Variables -->
+                <xs:element name="EnvironmentVariables" minOccurs="0">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Activation -->
+                <xs:element name="Activation" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="ProductKey" type="xs:string" minOccurs="0"/>
+                            <xs:element name="Version" type="xs:string" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Windows Update -->
+                <xs:element name="WindowsUpdate" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="NoAutoUpdate" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="AUOptions" type="AUOptionsType" minOccurs="0"/>
+                            <xs:element name="AutoInstallMinorUpdates" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="ScheduledInstallDay" type="ScheduledInstallDayType" minOccurs="0"/>
+                            <xs:element name="ScheduledInstallTime" type="ScheduledInstallTimeType" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Taskbar -->
+                <xs:element name="Taskbar" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="TaskbarAlignment" type="TaskbarAlignmentType" minOccurs="0"/>
+                            <xs:element name="DisableMeetNow" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableWidgets" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableTaskView" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableSearch" type="xs:boolean" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Privacy -->
+                <xs:element name="Privacy" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="DisableTelemetry" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableDiagTrack" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableAppPrivacy" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisablePersonalisedAdvertising" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableStartMenuTracking" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableActivityHistory" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableClipboardDataCollection" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableStartMenuSuggestions" type="xs:boolean" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Security -->
+                <xs:element name="Security" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="DisableDefender" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableUAC" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="UACLevel" type="UACLevelType" minOccurs="0"/>
+                            <xs:element name="DisableSMB1" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableAutoPlay" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="BitLocker" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:all>
+                                        <xs:element name="Enable" type="xs:boolean" minOccurs="0"/>
+                                        <xs:element name="Target" type="DrivePathType" minOccurs="0"/>
+                                    </xs:all>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Applications -->
+                <xs:element name="Applications" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="PackageManager" type="PackageManagerType" minOccurs="0"/>
+                            <xs:element name="ChocolateyApps" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="App" maxOccurs="unbounded">
+                                            <xs:complexType>
+                                                <xs:simpleContent>
+                                                    <xs:extension base="xs:string">
+                                                        <xs:attribute name="Version" type="xs:string"/>
+                                                    </xs:extension>
+                                                </xs:simpleContent>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                            <xs:element name="WingetApps" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="App" maxOccurs="unbounded">
+                                            <xs:complexType>
+                                                <xs:attribute name="ID" type="xs:string" use="required"/>
+                                                <xs:attribute name="Version" type="xs:string"/>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                            <xs:element name="InstallGoogleChrome" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="InstallGoogleDrive" type="xs:boolean" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Fonts -->
+                <xs:element name="Fonts" minOccurs="0">
+                    <xs:complexType>
+                        <xs:sequence>
+                            <xs:element name="Font" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                        </xs:sequence>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Power -->
+                <xs:element name="Power" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="PowerPlan" type="PowerPlanType" minOccurs="0"/>
+                            <xs:element name="DisableSleep" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableHibernate" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DisableFastStartup" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="MonitorTimeout" type="TimeoutType" minOccurs="0"/>
+                            <xs:element name="SleepTimeout" type="TimeoutType" minOccurs="0"/>
+                            <xs:element name="HibernateTimeout" type="TimeoutType" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Registry -->
+                <xs:element name="Registry" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="Add" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="Entry" maxOccurs="unbounded">
+                                            <xs:complexType>
+                                                <xs:all>
+                                                    <xs:element name="Path" type="xs:string"/>
+                                                    <xs:element name="Name" type="xs:string"/>
+                                                    <xs:element name="Type" type="RegistryValueType"/>
+                                                    <xs:element name="Value" type="xs:string"/>
+                                                </xs:all>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                            <xs:element name="Remove" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="Entry" maxOccurs="unbounded">
+                                            <xs:complexType>
+                                                <xs:all>
+                                                    <xs:element name="Path" type="xs:string"/>
+                                                    <xs:element name="Name" type="xs:string"/>
+                                                </xs:all>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Google -->
+                <xs:element name="Google" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="InstallGoogleDrive" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="InstallGoogleChrome" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="InstallGCPW" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="EnrollmentToken" type="xs:string" minOccurs="0"/>
+                            <xs:element name="DomainsAllowedToLogin" type="xs:string" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Office -->
+                <xs:element name="Office" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="LicenseKey" type="xs:string" minOccurs="0"/>
+                            <xs:element name="ProductID" type="xs:string" minOccurs="0"/>
+                            <xs:element name="LanguageID" type="xs:string" minOccurs="0"/>
+                            <xs:element name="DisplayLevel" type="OfficeDisplayLevelType" minOccurs="0"/>
+                            <xs:element name="SetupReboot" type="SetupRebootType" minOccurs="0"/>
+                            <xs:element name="Channel" type="OfficeChannelType" minOccurs="0"/>
+                            <xs:element name="OfficeClientEdition" type="xs:integer" minOccurs="0"/>
+                            <xs:element name="UpdatesEnabled" type="xs:boolean" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Theme -->
+                <xs:element name="Theme" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="DarkMode" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="DesktopIconSize" type="DesktopIconSizeType" minOccurs="0"/>
+                            <xs:element name="TransparencyEffects" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="WallpaperPath" type="xs:string" minOccurs="0"/>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+
+                <!-- Network Configuration -->
+                <xs:element name="Network" minOccurs="0">
+                    <xs:complexType>
+                        <xs:all>
+                            <xs:element name="NetworkDiscovery" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="FileAndPrinterSharing" type="xs:boolean" minOccurs="0"/>
+                            <xs:element name="NetworkDrives" minOccurs="0">
+                                <xs:complexType>
+                                    <xs:sequence>
+                                        <xs:element name="Drive" maxOccurs="unbounded">
+                                            <xs:complexType>
+                                                <xs:all>
+                                                    <xs:element name="Letter" type="DriveLetter"/>
+                                                    <xs:element name="Path" type="UNCPath"/>
+                                                    <xs:element name="Username" type="xs:string" minOccurs="0"/>
+                                                    <xs:element name="Password" type="xs:string" minOccurs="0"/>
+                                                </xs:all>
+                                            </xs:complexType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:complexType>
+                            </xs:element>
+                        </xs:all>
+                    </xs:complexType>
+                </xs:element>
+            </xs:all>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Add restrictions for specific values -->
+    <xs:simpleType name="PowerPlanType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Balanced"/>
+            <xs:enumeration value="HighPerformance"/>
+            <xs:enumeration value="PowerSaver"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="UACLevelType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Default"/>
+            <xs:enumeration value="AlwaysNotify"/>
+            <xs:enumeration value="NeverNotify"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TaskbarAlignmentType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Left"/>
+            <xs:enumeration value="Center"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="DesktopIconSizeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Small"/>
+            <xs:enumeration value="Medium"/>
+            <xs:enumeration value="Large"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="PackageManagerType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Chocolatey"/>
+            <xs:enumeration value="Winget"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="ScheduledInstallDayType">
+        <xs:restriction base="xs:integer">
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="7"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="ScheduledInstallTimeType">
+        <xs:restriction base="xs:integer">
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="23"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="RegistryValueType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="String"/>
+            <xs:enumeration value="ExpandString"/>
+            <xs:enumeration value="Binary"/>
+            <xs:enumeration value="DWord"/>
+            <xs:enumeration value="MultiString"/>
+            <xs:enumeration value="QWord"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="OfficeDisplayLevelType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Full"/>
+            <xs:enumeration value="None"/>
+            <xs:enumeration value="Minimal"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="OfficeChannelType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Current"/>
+            <xs:enumeration value="Monthly"/>
+            <xs:enumeration value="SemiAnnual"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="DriveLetter">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[A-Z]"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="UNCPath">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="\\\\[^\/\\:*?&quot;&lt;&gt;|]+\\.*"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="SetupRebootType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Always"/>
+            <xs:enumeration value="Never"/>
+            <xs:enumeration value="IfNeeded"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="DrivePathType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[A-Z]:"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="AUOptionsType">
+        <xs:restriction base="xs:integer">
+            <xs:enumeration value="2"/><!-- Notify -->
+            <xs:enumeration value="3"/><!-- Auto Download -->
+            <xs:enumeration value="4"/><!-- Auto Download and Install -->
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TimeoutType">
+        <xs:restriction base="xs:integer">
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="1440"/><!-- 24 hours in minutes -->
+        </xs:restriction>
+    </xs:simpleType>
+</xs:schema> 

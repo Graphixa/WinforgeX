@@ -1425,6 +1425,7 @@ function Set-PowerConfiguration {
         # Power Plan
         if ($PowerConfig.PowerPlan) {
             Write-SystemMessage -msg1 "- Setting power plan to: " -msg2 $PowerConfig.PowerPlan
+            Write-Log "Setting power plan to: $($PowerConfig.PowerPlan)"
             
             $guid = switch ($PowerConfig.PowerPlan) {
                 "Balanced" { "381b4222-f694-41f0-9685-ff5bb260df2e" }
