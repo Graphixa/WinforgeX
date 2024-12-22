@@ -921,21 +921,49 @@ function Install-Fonts {
     try {
         Write-SystemMessage -Title "Installing Fonts"
         
-        # Ensure Chocolatey is installed
-        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-            Write-Log "Installing Chocolatey package manager..."
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-        }
+        $ProgressPreference = 'SilentlyContinue'
+        $tempDownloadFolder = "$env:TEMP\google_fonts"
 
-        foreach ($font in $FontConfig.Font) {
-            Write-Log "Installing font: $font"
-            try {
-                choco install $font -y
+        foreach ($fontName in $FontConfig.Font) {
+            # Correct the font names for the GitHub repository
+            $correctFontName = $fontName -replace "\+", ""
+
+            # Check if the font is already installed
+            if (Test-FontInstalled -FontName $correctFontName) {
+                Write-Log "Font $correctFontName is already installed. Skipping..."
+                Write-SystemMessage -msg1 "- $correctFontName is already installed. Skipping..." -msg1Color "Cyan"
+                continue
             }
-            catch {
-                Write-Log "Failed to install font: $font" -Level Warning
+
+            Write-SystemMessage -msg1 "- Downloading & Installing: " -msg2 $correctFontName
+            Write-Log "Downloading & Installing $correctFontName from Google Fonts GitHub repository..."
+
+            try {
+                # Download the font files
+                Get-Fonts -fontName $correctFontName -outputPath $tempDownloadFolder
+
+                # Install the font files
+                $allFonts = Get-ChildItem -Path $tempDownloadFolder -Include *.ttf, *.otf -Recurse
+                foreach ($font in $allFonts) {
+                    $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
+                    Copy-Item -Path $font.FullName -Destination $fontDestination -Force
+
+                    # Add font to registry
+                    Set-RegistryModification -Action add -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -Type String
+                }
+
+                Write-Log "Font installed: $correctFontName"
+                Write-SuccessMessage -msg "$correctFontName installed successfully"
+
+            } catch {
+                Write-Log "Failed to install font $correctFontName : $($_.Exception.Message)" -Level Error
+                Write-ErrorMessage -msg "Failed to install font: $correctFontName"
+                continue
+            } finally {
+                # Clean up the downloaded font files
+                if (Test-Path $tempDownloadFolder) {
+                    Remove-Item -Path $tempDownloadFolder -Recurse -Force -ErrorAction SilentlyContinue
+                }
             }
         }
 
@@ -944,7 +972,11 @@ function Install-Fonts {
     }
     catch {
         Write-Log "Error installing fonts: $($_.Exception.Message)" -Level Error
+        Write-ErrorMessage -msg "Failed to install fonts"
         return $false
+    }
+    finally {
+        $ProgressPreference = 'Continue'
     }
 }
 
