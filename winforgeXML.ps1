@@ -238,23 +238,6 @@ function Set-RegistryModification {
     }
 }
 
-function Test-FontInstalled {
-    param(
-        [string]$FontName
-    )
-
-    $InstalledFonts = Get-Item "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" |
-                      Get-ItemProperty |
-                      ForEach-Object { [PSCustomObject]@{ 
-                            FontName = $_.PSObject.Properties.Name
-                            FontFile = $_.PSObject.Properties.Value
-                        }}
-
-    # Check if the partial font name exists in the filtered list
-    $isFontInstalled = $InstalledFonts | Where-Object { $_.FontName -like "*$FontName*" }
-
-    return $isFontInstalled
-}
 
 function Test-ProgramInstalled {
     param(
@@ -912,6 +895,66 @@ function Set-ScheduledTasksConfiguration {
     }
 }
 
+# Function to test if a font is installed
+function Test-FontInstalled {
+    param(
+        [string]$FontName
+    )
+
+    $InstalledFonts = Get-Item "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" |
+                      Get-ItemProperty |
+                      ForEach-Object { [PSCustomObject]@{ 
+                            FontName = $_.PSObject.Properties.Name
+                            FontFile = $_.PSObject.Properties.Value
+                        }}
+
+    $isFontInstalled = $InstalledFonts | Where-Object { $_.FontName -like "*$FontName*" }
+    return $isFontInstalled
+}
+
+# Function to download font files from GitHub
+function Get-Fonts {
+    param (
+        [string]$fontName,
+        [string]$outputPath
+    )
+
+    try {
+        $githubUrl = "https://github.com/google/fonts"
+        $fontRepoUrl = "$githubUrl/tree/main/ofl/$fontName"
+
+        if (-not (Test-Path -Path $outputPath)) {
+            New-Item -ItemType Directory -Path $outputPath | Out-Null
+        }
+
+        Write-Log "Fetching font files from GitHub: $fontRepoUrl"
+        $fontFilesPage = Invoke-WebRequest -Uri $fontRepoUrl -UseBasicParsing
+        $fontFileLinks = $fontFilesPage.Links | Where-Object { $_.href -match "\.ttf$" -or $_.href -match "\.otf$" }
+
+        if (-not $fontFileLinks) {
+            throw "No font files found for $fontName"
+        }
+
+        foreach ($link in $fontFileLinks) {
+            $fileUrl = "https://github.com" + $link.href.Replace("/blob/", "/raw/")
+            $fileName = [System.IO.Path]::GetFileName($link.href)
+            $outputFile = Join-Path -Path $outputPath -ChildPath $fileName
+
+            Write-Log "Downloading $fileName"
+            Invoke-WebRequest -Uri $fileUrl -OutFile $outputFile
+            
+            if (-not (Test-Path $outputFile)) {
+                throw "Failed to download $fileName"
+            }
+        }
+    }
+    catch {
+        Write-Log "Error downloading fonts: $($_.Exception.Message)" -Level Error
+        throw
+    }
+}
+
+# Function to install Google fonts from GitHub repository
 function Install-Fonts {
     param (
         [Parameter(Mandatory = $true)]
@@ -923,6 +966,7 @@ function Install-Fonts {
         
         $ProgressPreference = 'SilentlyContinue'
         $tempDownloadFolder = "$env:TEMP\google_fonts"
+        $script:tempFiles += $tempDownloadFolder
 
         foreach ($fontName in $FontConfig.Font) {
             # Correct the font names for the GitHub repository
@@ -948,8 +992,12 @@ function Install-Fonts {
                     $fontDestination = Join-Path -Path $env:windir\Fonts -ChildPath $font.Name
                     Copy-Item -Path $font.FullName -Destination $fontDestination -Force
 
-                    # Add font to registry
-                    Set-RegistryModification -Action add -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $font.BaseName -Value $font.Name -Type String
+                    # Register the font
+                    Set-RegistryModification -Action add `
+                        -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Fonts" `
+                        -Name $font.BaseName `
+                        -Value $font.Name `
+                        -Type String
                 }
 
                 Write-Log "Font installed: $correctFontName"
@@ -959,11 +1007,6 @@ function Install-Fonts {
                 Write-Log "Failed to install font $correctFontName : $($_.Exception.Message)" -Level Error
                 Write-ErrorMessage -msg "Failed to install font: $correctFontName"
                 continue
-            } finally {
-                # Clean up the downloaded font files
-                if (Test-Path $tempDownloadFolder) {
-                    Remove-Item -Path $tempDownloadFolder -Recurse -Force -ErrorAction SilentlyContinue
-                }
             }
         }
 
@@ -977,6 +1020,9 @@ function Install-Fonts {
     }
     finally {
         $ProgressPreference = 'Continue'
+        if (Test-Path $tempDownloadFolder) {
+            Remove-Item -Path $tempDownloadFolder -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
