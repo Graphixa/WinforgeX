@@ -867,22 +867,32 @@ function Set-ScheduledTasksConfiguration {
         Write-SystemMessage -Title "Configuring Scheduled Tasks"
 
         foreach ($task in $TasksConfig.Task) {
+            Write-SystemMessage -msg1 "- Importing task: " -msg2 $task.Name
             Write-Log "Importing task: $($task.Name)"
             
-            # Download task XML if it's a URL
-            if ($task.Path -match '^https?://') {
-                $tempPath = Join-Path $env:TEMP "$($task.Name).xml"
-                Invoke-WebRequest -Uri $task.Path -OutFile $tempPath
-                $taskPath = $tempPath
-            } else {
-                $taskPath = $task.Path
-            }
+            try {
+                # Handle remote or local task XML
+                if ($task.Path -match '^https?://') {
+                    $tempPath = Join-Path $env:TEMP "$($task.Name).xml"
+                    $script:tempFiles += $tempPath
+                    Invoke-WebRequest -Uri $task.Path -OutFile $tempPath
+                    $taskPath = $tempPath
+                } else {
+                    $taskPath = Join-Path $PSScriptRoot $task.Path
+                }
 
-            # Register the task
-            if (Test-Path $taskPath) {
-                Register-ScheduledTask -TaskName $task.Name -Xml (Get-Content $taskPath -Raw) -Force
-            } else {
-                Write-Log "Task XML file not found: $taskPath" -Level Warning
+                # Register the task
+                if (Test-Path $taskPath) {
+                    Register-ScheduledTask -TaskName $task.Name -Xml (Get-Content $taskPath -Raw) -Force
+                    Write-Log "Task imported successfully: $($task.Name)"
+                    Write-SystemMessage -msg1 "- Task imported successfully: " -msg2 $task.Name
+                } else {
+                    Write-Log "Task XML file not found: $taskPath" -Level Warning
+                    Write-ErrorMessage -msg "Task XML file not found: $taskPath"
+                }
+            } catch {
+                Write-Log "Failed to import task $($task.Name): $($_.Exception.Message)" -Level Error
+                Write-ErrorMessage -msg "Failed to import task: $($task.Name)"
             }
         }
 
@@ -891,6 +901,7 @@ function Set-ScheduledTasksConfiguration {
     }
     catch {
         Write-Log "Error configuring scheduled tasks: $($_.Exception.Message)" -Level Error
+        Write-ErrorMessage -msg "Failed to configure scheduled tasks"
         return $false
     }
 }
