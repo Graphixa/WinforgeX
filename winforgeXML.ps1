@@ -141,9 +141,19 @@ function Test-XmlSchema {
     )
     
     try {
+        Write-Log "Attempting to load schema from: $script:schemaPath"
         # Load and validate schema
         $schemaReader = New-Object System.Xml.XmlTextReader $script:schemaPath
         $schema = [System.Xml.Schema.XmlSchema]::Read($schemaReader, $null)
+        
+        # Add validation event handler
+        $eventHandler = {
+            param($sender, $e)
+            Write-Log "XML Validation Error: $($e.Message)" -Level Error
+            Write-Log "Line: $($e.Exception.LineNumber), Position: $($e.Exception.LinePosition)" -Level Error
+        }
+        $Xml.Schemas.ValidationEventHandler += $eventHandler
+        
         $Xml.Schemas.Add($schema) | Out-Null
         
         # Validate document
@@ -151,7 +161,10 @@ function Test-XmlSchema {
         return $true
     }
     catch {
-        Write-Log "XML validation error: $($_.Exception.Message)" -Level Error
+        Write-Log "Schema validation error: $($_.Exception.Message)" -Level Error
+        if ($_.Exception.InnerException) {
+            Write-Log "Inner Exception: $($_.Exception.InnerException.Message)" -Level Error
+        }
         return $false
     }
     finally {
